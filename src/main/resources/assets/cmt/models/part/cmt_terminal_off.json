@@ -1,6 +1,8 @@
 {
   "textures": {
-    "panel": "cmt:part/cmt_terminal_off_gray"
+    "lightsBright": "cmt:part/cmt_terminal_bright",
+    "lightsMedium": "cmt:part/cmt_terminal_medium",
+    "lightsDark": "cmt:part/cmt_terminal_dark"
   },
   "elements": [
     {
@@ -8,8 +10,28 @@
       "to": [14, 14, 2],
       "faces": {
         "north": {
-          "texture": "#panel",
+          "texture": "#lightsBright",
           "tintindex": 3
+        }
+      }
+    },
+    {
+      "from": [2, 2, 0],
+      "to": [14, 14, 2],
+      "faces": {
+        "north": {
+          "texture": "#lightsMedium",
+          "tintindex": 2
+        }
+      }
+    },
+    {
+      "from": [2, 2, 0],
+      "to": [14, 14, 2],
+      "faces": {
+        "north": {
+          "texture": "#lightsDark",
+          "tintindex": 1
         }
       }
     }

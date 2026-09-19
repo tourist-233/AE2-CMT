@@ -23,9 +23,9 @@ public class WcmtTerminalPart extends AbstractTerminalPart {
 
     /** This part's own front panel, drawn over the shared chassis and status indicator. */
     private static final ResourceLocation MODEL_OFF = ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID,
-            "part/wcmt_terminal_off");
+            "part/cmt_terminal_off");
     private static final ResourceLocation MODEL_ON = ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID,
-            "part/wcmt_terminal_on");
+            "part/cmt_terminal_on");
 
     // AE2 assembles display parts from three overlapping models: the shared chassis, one of the status
     // indicators, and the part's own face. The base part picks one of these three according to power

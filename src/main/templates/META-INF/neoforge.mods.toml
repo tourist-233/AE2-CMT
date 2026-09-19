@@ -8,9 +8,9 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="firefly-233"
 description='''
-AE2 CMT: adds the Wireless Component Management Terminal, a wireless AE2 terminal
-that remotely lists and manages the storage cells installed in every ME Drive of the
-linked ME network.
+AE2 CMT: adds the Component Management Terminal in two forms - a wireless terminal and a
+cable-mounted part. Both remotely list and manage the storage cells installed in every ME
+Drive of the linked ME network.
 '''
 
 [[dependencies.${mod_id}]]

@@ -2,7 +2,7 @@
   "parent": "ae2:item/display_base",
   "textures": {
     "front": "cmt:part/cmt_terminal_off",
-    "front_base": "cmt:part/cmt_terminal_screen",
+    "front_base": "cmt:part/cmt_terminal_off",
     "front_bright": "cmt:part/cmt_terminal_blank",
     "front_medium_bright": "cmt:part/cmt_terminal_blank",
     "front_medium": "cmt:part/cmt_terminal_blank",

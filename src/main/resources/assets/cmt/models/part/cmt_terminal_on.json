@@ -11,7 +11,6 @@
       "faces": {
         "north": {
           "texture": "#lightsBright",
-          "tintindex": 3,
           "neoforge_data": { "block_light": 15, "sky_light": 15 }
         }
       }
@@ -22,7 +21,6 @@
       "faces": {
         "north": {
           "texture": "#lightsMedium",
-          "tintindex": 2,
           "neoforge_data": { "block_light": 15, "sky_light": 15 }
         }
       }
@@ -33,7 +31,6 @@
       "faces": {
         "north": {
           "texture": "#lightsDark",
-          "tintindex": 1,
           "neoforge_data": { "block_light": 15, "sky_light": 15 }
         }
       }

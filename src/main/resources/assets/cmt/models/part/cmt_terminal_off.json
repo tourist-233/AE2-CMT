@@ -8,8 +8,7 @@
       "to": [14, 14, 2],
       "faces": {
         "north": {
-          "texture": "#panel",
-          "tintindex": 3
+          "texture": "#panel"
         }
       }
     }

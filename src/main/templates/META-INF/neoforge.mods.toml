@@ -16,7 +16,7 @@ Drive of the linked ME network.
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"
-    versionRange="[21.1,)"
+    versionRange="[21.1.169,)"
     ordering="NONE"
     side="BOTH"
 

@@ -1,7 +1,7 @@
 # AE2 CMT — 元件管理终端
 
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-62b47a.svg)](https://www.minecraft.net/)
-[![NeoForge](https://img.shields.io/badge/NeoForge-21.1.240%2B-e8a33d.svg)](https://neoforged.net/)
+[![NeoForge](https://img.shields.io/badge/NeoForge-21.1.230%2B-e8a33d.svg)](https://neoforged.net/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **AE2 CMT** 是一个 Applied Energistics 2 附属模组：不用跑到驱动器面前，就能远程查看并整理整张 ME 网络里所有 ME 驱动器中的存储元件。
@@ -39,7 +39,7 @@
 
 ## 依赖
 
-必需：Minecraft **1.21.1**、NeoForge **21.1.240+**、Applied Energistics 2 **19.2.17+**
+必需：Minecraft **1.21.1**、NeoForge **21.1.230+**（AE2 本身要求 21.1.169 以上）、Applied Energistics 2 **19.2.17+**
 
 可选：[AE2WTlib](https://github.com/Mari023/AE2WirelessTerminalLibrary) **19.5.1+** —— 提供通用终端集成（其 API 已通过 jarJar 内嵌，不装也能正常使用）
 

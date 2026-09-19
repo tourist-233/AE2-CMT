@@ -19,6 +19,16 @@ sourceSets.main.resources {
 }
 
 repositories {
+    // Minecraft's library mirror has no aarch64 natives, so LWJGL must always come from Central.
+    exclusiveContent {
+        forRepository {
+            mavenCentral()
+        }
+        filter {
+            includeGroup "org.lwjgl"
+        }
+    }
+
     // Maven Central first: several NeoForm tool artifacts (DiffPatch, jst-cli-bundle) are
     // mirrored there and reachable via IPv4, while maven.neoforged.net's IPv4 is firewalled.
     mavenCentral()
@@ -58,6 +68,10 @@ neoForge {
         client {
             client()
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            // See the LWJGL natives note in the dependencies block; only applies on aarch64 hosts.
+            if (System.getProperty("os.arch") == "aarch64") {
+                systemProperty 'org.lwjgl.librarypath', "${rootDir}/build/lwjgl-natives/flat"
+            }
         }
 
         server {
@@ -96,6 +110,18 @@ dependencies {
     // the library mod itself is not installed. The full mod is dev-runtime only.
     jarJar(implementation("de.mari_023:ae2wtlib_api:${ae2wtlib_version}"))
     localRuntime "de.mari_023:ae2wtlib:${ae2wtlib_version}"
+
+    // Minecraft's LWJGL dependency only carries x64 natives, but this container is aarch64.
+    // Supplying the matching native jars lets the headless dev client run here; no effect elsewhere.
+    if (System.getProperty("os.arch") == "aarch64") {
+        ["lwjgl", "lwjgl-glfw", "lwjgl-opengl", "lwjgl-openal", "lwjgl-stb", "lwjgl-tinyfd", "lwjgl-jemalloc"].each { module ->
+            localRuntime("org.lwjgl:${module}:3.3.3") {
+                artifact {
+                    classifier = "natives-linux-arm64"
+                }
+            }
+        }
+    }
 }
 
 // Expands ${...} placeholders in the mod metadata template.

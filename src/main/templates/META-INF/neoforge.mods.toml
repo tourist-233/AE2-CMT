@@ -1,0 +1,44 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="firefly-233"
+description='''
+AE2 CMT: adds the Wireless Component Management Terminal, a wireless AE2 terminal
+that remotely lists and manages the storage cells installed in every ME Drive of the
+linked ME network.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="ae2"
+    type="required"
+    versionRange="[${ae2_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+# ae2wtlib - optional; its API is embedded via jarJar, so the terminal also works without it.
+# When installed, the terminal is additionally reachable from AE2WTlib's universal terminal.
+[[dependencies.${mod_id}]]
+    modId="ae2wtlib"
+    type="optional"
+    versionRange="[${ae2wtlib_version},)"
+    ordering="AFTER"
+    side="BOTH"

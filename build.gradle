@@ -1,0 +1,145 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.144'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude("**/*.bbmodel")
+    exclude("src/generated/**/.cache")
+}
+
+repositories {
+    // Maven Central first: several NeoForm tool artifacts (DiffPatch, jst-cli-bundle) are
+    // mirrored there and reachable via IPv4, while maven.neoforged.net's IPv4 is firewalled.
+    mavenCentral()
+
+    maven {
+        name = "ModMaven"
+        url = "https://modmaven.dev/"
+        content {
+            includeGroup "appeng"
+            includeGroup "de.mari_023"
+        }
+    }
+    maven {
+        name = "CurseMaven"
+        url = "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    // AE2 - required for wireless terminals and ME network access.
+    // AE2 19.2.17 is published on CurseMaven (file 7027323); compileOnly keeps the mod jar
+    // free of bundled AE2, runtimeOnly makes dev runs work. GuideME is AE2's runtime dep.
+    compileOnly "curse.maven:applied-energistics-2-223794:7027323"
+    runtimeOnly "curse.maven:applied-energistics-2-223794:7027323"
+    runtimeOnly "curse.maven:guideme-1173950:7127444"
+
+    // AE2WTlib: only its API is needed at build time, and it is embedded through jarJar so the
+    // terminal can extend ItemWT (and therefore appear in AE2WTlib's universal terminal) even when
+    // the library mod itself is not installed. The full mod is dev-runtime only.
+    jarJar(implementation("de.mari_023:ae2wtlib_api:${ae2wtlib_version}"))
+    localRuntime "de.mari_023:ae2wtlib:${ae2wtlib_version}"
+}
+
+// Expands ${...} placeholders in the mod metadata template.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            ae2_version            : ae2_version,
+            ae2wtlib_version       : ae2wtlib_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

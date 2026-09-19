@@ -1,0 +1,14 @@
+{
+  "item.cmt.wireless_component_management_terminal": "Wireless Component Management Terminal",
+  "item.cmt.component_management_terminal": "ME Component Management Terminal",
+  "gui.cmt.not_connected": "Terminal is not connected to a network",
+  "gui.cmt.no_permission": "You are not allowed to use this terminal",
+  "gui.cmt.too_large": "Too many cells to display",
+  "gui.cmt.infinite": "Infinite Storage",
+  "gui.cmt.groove_types": "Storage types: %s used / %s total",
+  "gui.cmt.groove_storage": "Storage: %s used / %s total",
+  "gui.cmt.groove_used": "%s used",
+  "gui.cmt.groove_types_infinite": "Storage types: unlimited",
+  "gui.cmt.groove_storage_infinite": "Storage: unlimited",
+  "gui.cmt.empty_slot": "Empty slot in %s"
+}

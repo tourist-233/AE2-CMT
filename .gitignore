@@ -1,0 +1,11 @@
+# Gradle caches, build output and game run data
+.gradle/
+build/
+run/
+logs/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.eclipse/

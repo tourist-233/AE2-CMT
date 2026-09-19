@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "cmt:item/wireless_component_management_terminal"
+  }
+}

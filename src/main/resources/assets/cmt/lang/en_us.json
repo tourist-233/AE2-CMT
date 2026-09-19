@@ -10,5 +10,6 @@
   "gui.cmt.groove_used": "%s used",
   "gui.cmt.groove_types_infinite": "Storage types: unlimited",
   "gui.cmt.groove_storage_infinite": "Storage: unlimited",
-  "gui.cmt.empty_slot": "Empty slot in %s"
+  "gui.cmt.empty_slot": "Empty slot in %s",
+  "key.ae2.wireless_cmt_terminal": "Open the Wireless Component Management Terminal"
 }

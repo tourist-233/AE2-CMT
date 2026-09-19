@@ -37,22 +37,11 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Drive manager GUI.
  *
- * <p>The panel is stitched from four slices of {@code wcmt_cell.png}:
- * <ol>
- * <li><b>header</b> {@code [0,6,215,17]} — the title bar plus the top edge of the first light panel,</li>
- * <li><b>content row</b> {@code [0,235,215,18]} — the strip at the very bottom of the sheet, repeated
- * once per content row; the first row sits at the very top of that panel and a drive occupies a name
- * row plus one row of its cells,</li>
- * <li><b>slot well</b> {@code [8,150,16,18]} — one cell's well, taken from an inventory row and
- * pasted once per cell (10 pastes = a drive's 10 cells),</li>
- * <li><b>bottom</b> {@code [0,77,215,9]} + {@code [0,86,176,148]} — the first panel's full-width
- * bottom edge and band, then the (narrower, as drawn in the sheet) middle light panel and the player
- * inventory.</li>
- * </ol>
- *
- * <p>Panel height is {@code header + rows * 18 + bottom}, i.e. it grows and shrinks with the row
- * count the way AE2 terminals resize via {@code TerminalStyle.getScreenHeight(rows)}. The scrollbar's
- * track is pre-baked in the sheet at {@code x=198..202}, so only the handle is drawn.
+ * <p>The panel is stitched from slices of {@code cmt_interface.png} (256x256; the live area is
+ * x 0..208, y 90..252): a 17 px title bar, one 18 px content row per row of drives, that area's own
+ * 7 px closing edge, the 74 px player-inventory block and an 11 px closing edge. Panel height is
+ * therefore {@code header + rows * 18 + edge + inventory + bottom}, so it grows and shrinks with the
+ * row count the way AE2 terminals resize via {@code TerminalStyle.getScreenHeight(rows)}.
  */
 public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerminalCapable {
 
@@ -68,11 +57,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /**
      * Extra width on the right of the panel, exactly the upgrade panel's width: the panel hangs off
      * the sheet's right edge the same way AE2's terminal-height button hangs off the left edge.
-     */
-    /**
-     * Extra width on the right of the panel: the upgrade panel itself plus the strip for its scrollbar
-     * (the panel is 28 px wide and grows by 5 px once it has to scroll, as it does in the universal
-     * terminal where every installed terminal contributes slots).
+     * 28 px for the panel itself plus 5 px for the strip its scrollbar needs.
      */
     private static final int UPGRADE_COLUMN_WIDTH = 33;
     /** Total screen width, i.e. the clickable area. */
@@ -81,8 +66,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** Plain text colour used for labels (matches the drive names). */
     private static final int LABEL_COLOR = 0xFF3B3B4D;
     private static final Style LABEL_STYLE = Style.EMPTY.withColor(TextColor.fromRgb(LABEL_COLOR));
-
-    /** The sheet also carries one further content row at y=235; the panel only needs the first. */
 
     /** Player inventory block: three rows plus the hotbar, wells 16 px wide, 18 px apart. */
     private static final int INV_V = 150;
@@ -137,6 +120,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** AE2's scrollbar handle is centred on the sheet's right-hand groove (x 194..201). */
     private static final int SCROLLBAR_X = 192;
 
+    /** Smallest content-row budget the panel may shrink to; the drawn row count can be lower. */
     private static final int MIN_ROWS = 4;
     private static final int MAX_ROWS = WcmtMenu.MAX_ROWS;
     private static final int HIDDEN = -9999;

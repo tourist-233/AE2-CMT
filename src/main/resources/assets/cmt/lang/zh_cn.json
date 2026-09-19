@@ -10,5 +10,6 @@
   "gui.cmt.groove_used": "占用 %s",
   "gui.cmt.groove_types_infinite": "存储类型：无限",
   "gui.cmt.groove_storage_infinite": "存储量：无限",
-  "gui.cmt.empty_slot": "%s 的空槽位"
+  "gui.cmt.empty_slot": "%s 的空槽位",
+  "key.ae2.wireless_cmt_terminal": "打开无线元件管理终端"
 }

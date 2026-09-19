@@ -4,6 +4,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.storage.cells.CellState;
@@ -71,9 +73,12 @@ final class NeoEcoDrive implements ManagedDrive {
             extract = hostClass.getMethod("canExtractCell");
             status = StorageCell.class.getMethod("getStatus");
             cluster = findMethod(driveClass, "getCluster");
+        } catch (ClassNotFoundException e) {
+            // NeoECO is simply not installed: stay inert and quiet.
+            driveClass = null;
         } catch (ReflectiveOperationException | LinkageError e) {
-            // NeoECO is not installed (or changed its API): stay inert, but leave a trace for debugging.
-            WcmtMod.LOGGER.debug("NeoECO cell-host bridge inactive: {}", e.toString());
+            WcmtMod.LOGGER.warn("NeoECO is installed but its cell-host API did not match; "
+                    + "NeoECO storage matrices will be ignored", e);
             driveClass = null;
         }
         Method inventory = null;
@@ -189,12 +194,19 @@ final class NeoEcoDrive implements ManagedDrive {
         return null;
     }
 
+    /** Methods already reported as failing, so a broken bridge warns once instead of every tick. */
+    private static final Set<String> REPORTED_FAILURES = ConcurrentHashMap.newKeySet();
+
     private static Object invoke(Method method, Object target, Object... args) {
         try {
             return method.invoke(target, args);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             // Whatever goes wrong (changed signature, missing class, rejected argument) must degrade to
-            // "no value" rather than escape into the menu's tick.
+            // "no value" rather than escape into the menu's tick, but it should not vanish silently.
+            if (REPORTED_FAILURES.add(method.getName())) {
+                WcmtMod.LOGGER.warn("NeoECO bridge call {}() failed; the drive still works but reports "
+                        + "no data for it", method.getName(), e);
+            }
             return null;
         }
     }

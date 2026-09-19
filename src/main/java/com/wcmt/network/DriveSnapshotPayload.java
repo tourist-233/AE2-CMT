@@ -29,7 +29,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * window. {@code blocked} tells the client that the terminal cannot be used right now (unlinked, out
  * of range, out of power or nothing fits) and {@code status} is the text to show for it.
  */
-public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, int totalDrives,
+public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
         long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite)
         implements CustomPacketPayload {
@@ -50,8 +50,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
     }
 
     /** One ME Drive inside the current window; {@code icon} is the drive block's own item. */
-    public record DriveInfo(ResourceLocation dimension, BlockPos pos, Component name, boolean online,
-            ItemStack icon, List<SlotStat> slots) {
+    public record DriveInfo(BlockPos pos, Component name, ItemStack icon, List<SlotStat> slots) {
     }
 
     public static final Type<DriveSnapshotPayload> TYPE = new Type<>(
@@ -69,7 +68,6 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         buf.writeVarInt(p.offset);
         buf.writeVarInt(p.totalRows);
         buf.writeVarInt(p.skippedRows);
-        buf.writeVarInt(p.totalDrives);
         buf.writeBoolean(p.blocked);
         buf.writeUtf(p.sort);
         buf.writeUtf(p.search);
@@ -89,7 +87,6 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         int offset = buf.readVarInt();
         int totalRows = buf.readVarInt();
         int skippedRows = buf.readVarInt();
-        int totalDrives = buf.readVarInt();
         boolean blocked = buf.readBoolean();
         String sort = buf.readUtf();
         String search = buf.readUtf();
@@ -104,14 +101,12 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         long byteUsed = buf.readVarLong();
         long byteTotal = buf.readVarLong();
         boolean infinite = buf.readBoolean();
-        return new DriveSnapshotPayload(offset, totalRows, skippedRows, totalDrives, blocked, sort, search,
+        return new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked, sort, search,
                 status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite);
     }
 
     private static void encodeDrive(RegistryFriendlyByteBuf buf, DriveInfo d) {
-        buf.writeResourceLocation(d.dimension());
         buf.writeBlockPos(d.pos());
-        buf.writeBoolean(d.online());
         ComponentSerialization.STREAM_CODEC.encode(buf, d.name());
         ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, d.icon());
         buf.writeVarInt(d.slots().size());
@@ -121,9 +116,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
     }
 
     private static DriveInfo decodeDrive(RegistryFriendlyByteBuf buf) {
-        ResourceLocation dimension = buf.readResourceLocation();
         BlockPos pos = buf.readBlockPos();
-        boolean online = buf.readBoolean();
         Component name = ComponentSerialization.STREAM_CODEC.decode(buf);
         ItemStack icon = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
         int statCount = buf.readVarInt();
@@ -131,7 +124,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         for (int i = 0; i < statCount; i++) {
             slots.add(decodeStat(buf));
         }
-        return new DriveInfo(dimension, pos, name, online, icon, slots);
+        return new DriveInfo(pos, name, icon, slots);
     }
 
     private static void encodeStat(RegistryFriendlyByteBuf buf, SlotStat s) {

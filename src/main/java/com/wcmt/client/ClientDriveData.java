@@ -44,14 +44,6 @@ public final class ClientDriveData {
         return snapshot != null && snapshot.blocked();
     }
 
-    public static String sort() {
-        return snapshot == null ? "POSITION" : snapshot.sort();
-    }
-
-    public static String search() {
-        return snapshot == null ? "" : snapshot.search();
-    }
-
     public static List<DriveSnapshotPayload.DriveInfo> drives() {
         return snapshot == null ? List.of() : snapshot.drives();
     }

@@ -106,6 +106,12 @@ public class WcmtMenu extends AEBaseMenu {
         this.part = host instanceof WcmtTerminalPart cablePart ? cablePart : null;
         this.serverSide = isServerSide();
         // The cable-mounted part is governed by AE2's network security, so it needs no owner check.
+        // Claim the terminal here too: opening it through AE2WTlib's universal terminal never passes
+        // through prepareOpen, and the host stack is the only stack carrying the owner in both the
+        // held-item and the universal-terminal case.
+        if (serverSide && this.host != null) {
+            WcmtPermissions.assignOwnerIfAbsent(getPlayer(), this.host.getItemStack());
+        }
         this.canOperate = !serverSide || this.host == null
                 || WcmtPermissions.canUse(getPlayer(), this.host.getItemStack());
         this.driveInventory = new PagedDriveInventory(serverSide, this);
@@ -435,7 +441,7 @@ public class WcmtMenu extends AEBaseMenu {
             infos.add(buildInfo(drive));
         }
         PacketDistributor.sendToPlayer(serverPlayer,
-                new DriveSnapshotPayload(offset, totalRows, skippedRows, allDrives.size(), blocked(),
+                new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked(),
                         sortMode.name(), search, linkStatusMessage(), infos,
                         netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite));
     }
@@ -446,8 +452,8 @@ public class WcmtMenu extends AEBaseMenu {
             return GuiText.OutOfPower.text();
         }
         ILinkStatus status = linkStatus();
-        if (!status.connected()) {
-            Component reason = status.statusDescription();
+        if (status == null || !status.connected()) {
+            Component reason = status != null ? status.statusDescription() : null;
             return reason != null ? reason : Component.translatable("gui.cmt.not_connected");
         }
         if (windowOverflow) {
@@ -462,18 +468,12 @@ public class WcmtMenu extends AEBaseMenu {
         for (int i = 0; i < cells; i++) {
             stats.add(drive.stat(i));
         }
-        return new DriveSnapshotPayload.DriveInfo(drive.dimension(), drive.pos(), drive.name(), drive.online(),
-                drive.icon(), stats);
+        return new DriveSnapshotPayload.DriveInfo(drive.pos(), drive.name(), drive.icon(), stats);
     }
 
     /** The menu host, exposed for AE2WTlib's universal-terminal integration. */
-    /** The wireless host, or null for the cable-mounted part (the screen uses this for AE2WTlib). */
     @Nullable
     public WcmtMenuHost getWcmtHost() {
         return host;
-    }
-
-    public SortMode getSortMode() {
-        return sortMode;
     }
 }

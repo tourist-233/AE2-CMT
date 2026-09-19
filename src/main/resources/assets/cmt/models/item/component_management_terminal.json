@@ -2,8 +2,11 @@
   "parent": "ae2:item/display_base",
   "textures": {
     "front": "cmt:part/cmt_terminal_off",
-    "front_bright": "cmt:part/cmt_terminal_bright",
-    "front_medium": "cmt:part/cmt_terminal_medium",
-    "front_dark": "cmt:part/cmt_terminal_dark"
+    "front_base": "cmt:part/cmt_terminal_off",
+    "front_bright": "cmt:part/cmt_terminal_bright_item",
+    "front_medium": "cmt:part/cmt_terminal_medium_item",
+    "front_dark": "cmt:part/cmt_terminal_dark_item",
+    "sides": "cmt:part/cmt_terminal_sides",
+    "back": "cmt:part/cmt_terminal_sides"
   }
 }

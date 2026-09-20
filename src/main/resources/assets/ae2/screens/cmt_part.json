@@ -1,10 +1,12 @@
 {
   "$schema": "schema.json",
-  "includes": ["common/common.json"],
+  "includes": [
+    "common/common.json"
+  ],
   "text": {
     "dialog_title": {
       "text": {
-        "translate": "item.cmt.component_management_terminal"
+        "translate": "gui.cmt.terminal_title"
       },
       "position": {
         "left": 8,

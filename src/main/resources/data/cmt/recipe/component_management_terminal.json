@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A",
+    "B",
+    "C"
+  ],
+  "key": {
+    "A": {
+      "item": "ae2:semi_dark_monitor"
+    },
+    "B": {
+      "item": "ae2:engineering_processor"
+    },
+    "C": {
+      "item": "ae2:drive"
+    }
+  },
+  "result": {
+    "id": "cmt:component_management_terminal",
+    "count": 1
+  }
+}

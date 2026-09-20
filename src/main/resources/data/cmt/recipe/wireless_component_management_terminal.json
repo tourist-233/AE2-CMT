@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A",
+    "B",
+    "C"
+  ],
+  "key": {
+    "A": {
+      "item": "ae2:wireless_receiver"
+    },
+    "B": {
+      "item": "cmt:component_management_terminal"
+    },
+    "C": {
+      "item": "ae2:dense_energy_cell"
+    }
+  },
+  "result": {
+    "id": "cmt:wireless_component_management_terminal",
+    "count": 1
+  }
+}

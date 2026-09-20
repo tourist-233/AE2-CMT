@@ -5,11 +5,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-import com.wcmt.config.WcmtConfig;
 import com.wcmt.init.ModMenus;
 import com.wcmt.network.DriveSnapshotPayload;
 import com.wcmt.network.WcmtActionPayload;
-import com.wcmt.util.WcmtPermissions;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -50,6 +48,8 @@ public class WcmtMenu extends AEBaseMenu {
     public static final int MAX_SLOTS = 128;
     /** The network-wide totals get their own, slower rate: reading them walks cell contents. */
     private static final int TOTALS_SCAN_TICKS = 20;
+    /** How often, in ticks, the terminal rescans the network for drives while it is open. */
+    private static final int SCAN_INTERVAL_TICKS = 10;
     /** Upgrade slots in the panel's top-right corner; four energy cards quadruple the power buffer. */
     public static final int UPGRADE_SLOTS = 4;
 
@@ -67,7 +67,6 @@ public class WcmtMenu extends AEBaseMenu {
     private final WcmtTerminalPart part;
     private final PagedDriveInventory driveInventory;
     private final boolean serverSide;
-    private final boolean canOperate;
 
     private int tickCounter;
     private boolean needsSnapshot = true;
@@ -105,15 +104,6 @@ public class WcmtMenu extends AEBaseMenu {
         this.host = host instanceof WcmtMenuHost wireless ? wireless : null;
         this.part = host instanceof WcmtTerminalPart cablePart ? cablePart : null;
         this.serverSide = isServerSide();
-        // The cable-mounted part is governed by AE2's network security, so it needs no owner check.
-        // Claim the terminal here too: opening it through AE2WTlib's universal terminal never passes
-        // through prepareOpen, and the host stack is the only stack carrying the owner in both the
-        // held-item and the universal-terminal case.
-        if (serverSide && this.host != null) {
-            WcmtPermissions.assignOwnerIfAbsent(getPlayer(), this.host.getItemStack());
-        }
-        this.canOperate = !serverSide || this.host == null
-                || WcmtPermissions.canUse(getPlayer(), this.host.getItemStack());
         this.driveInventory = new PagedDriveInventory(serverSide, this);
 
         for (int i = 0; i < MAX_SLOTS; i++) {
@@ -156,14 +146,14 @@ public class WcmtMenu extends AEBaseMenu {
         if (!serverSide) {
             return true;
         }
-        return linkUsable() && hasPower() && canOperate && WcmtConfig.ALLOW_INSERT.get();
+        return linkUsable() && hasPower();
     }
 
     public boolean canExtract() {
         if (!serverSide) {
             return true;
         }
-        return linkUsable() && hasPower() && canOperate && WcmtConfig.ALLOW_EXTRACT.get();
+        return linkUsable() && hasPower();
     }
 
     /** False while the terminal is unlinked, out of range or out of power. */
@@ -261,7 +251,7 @@ public class WcmtMenu extends AEBaseMenu {
             return;
         }
         tickCounter++;
-        int interval = WcmtConfig.SCAN_INTERVAL_TICKS.get();
+        int interval = SCAN_INTERVAL_TICKS;
         if (needsSnapshot || tickCounter % interval == 0) {
             needsSnapshot = false;
             refreshDrives();

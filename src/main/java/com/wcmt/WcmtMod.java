@@ -3,8 +3,6 @@ package com.wcmt;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
-import com.wcmt.config.WcmtConfig;
-import com.wcmt.init.ModComponents;
 import com.wcmt.init.ModItems;
 import com.wcmt.init.ModMenus;
 import com.wcmt.network.DriveSnapshotPayload;
@@ -23,9 +21,7 @@ import de.mari_023.ae2wtlib.api.registration.AddTerminalEvent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -35,8 +31,7 @@ public class WcmtMod {
     public static final String MOD_ID = "cmt";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public WcmtMod(IEventBus modEventBus, ModContainer modContainer) {
-        ModComponents.DATA_COMPONENTS.register(modEventBus);
+    public WcmtMod(IEventBus modEventBus) {
         ModItems.register(modEventBus);
         // Touch ModMenus so its menu type is queued into AE2's registry before the registry event fires.
         ModMenus.init();
@@ -62,8 +57,6 @@ public class WcmtMod {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::addCreativeTabItems);
         modEventBus.addListener(this::registerPayloads);
-
-        modContainer.registerConfig(ModConfig.Type.SERVER, WcmtConfig.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

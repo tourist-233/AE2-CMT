@@ -4,7 +4,6 @@ import org.jetbrains.annotations.Nullable;
 
 import com.wcmt.init.ModMenus;
 import com.wcmt.menu.WcmtMenuHost;
-import com.wcmt.util.WcmtPermissions;
 
 import appeng.api.upgrades.IUpgradeInventory;
 import appeng.api.upgrades.UpgradeInventories;
@@ -14,7 +13,6 @@ import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
 import com.wcmt.menu.WcmtMenu;
 import de.mari_023.ae2wtlib.api.terminal.ItemWT;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -70,7 +68,7 @@ public class WcmtTerminalItem extends ItemWT {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide()) {
             ItemMenuHostLocator locator = MenuLocators.forHand(player, hand);
-            if (prepareOpen(player, stack) && MenuOpener.open(getMenuType(), player, locator)) {
+            if (prepareOpen(stack) && MenuOpener.open(getMenuType(), player, locator)) {
                 return InteractionResultHolder.sidedSuccess(stack, false);
             }
         }
@@ -80,25 +78,18 @@ public class WcmtTerminalItem extends ItemWT {
     @Override
     protected boolean openFromInventory(Player player, ItemMenuHostLocator locator, boolean returningFromSubmenu) {
         ItemStack stack = locator.locateItem(player);
-        if (stack.isEmpty() || !prepareOpen(player, stack)) {
+        if (stack.isEmpty() || !prepareOpen(stack)) {
             return false;
         }
         return MenuOpener.open(getMenuType(), player, locator, returningFromSubmenu);
     }
 
     /**
-     * Gate opening on permission only. AE2's link status is not a gate: the terminal opens while
-     * unlinked, out of range or out of power too, and the screen then says why it cannot be used.
+     * Gate opening on the item actually being this terminal. AE2's link status is not a gate: the
+     * terminal opens while unlinked, out of range or out of power too, and the screen then says why
+     * it cannot be used.
      */
-    private boolean prepareOpen(Player player, ItemStack stack) {
-        if (stack.isEmpty() || stack.getItem() != this) {
-            return false;
-        }
-        if (!WcmtPermissions.canUse(player, stack)) {
-            player.displayClientMessage(Component.translatable("gui.cmt.no_permission"), true);
-            return false;
-        }
-        WcmtPermissions.assignOwnerIfAbsent(player, stack);
-        return true;
+    private boolean prepareOpen(ItemStack stack) {
+        return !stack.isEmpty() && stack.getItem() == this;
     }
 }

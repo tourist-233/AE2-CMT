@@ -18,6 +18,14 @@
     "scrollbar": {
       "left": 192,
       "top": 17
+    },
+    "scrollingUpgrades": {
+      "right": 35,
+      "top": 0
+    },
+    "upgradeScrollbar": {
+      "right": 16,
+      "top": 6
     }
   }
 }

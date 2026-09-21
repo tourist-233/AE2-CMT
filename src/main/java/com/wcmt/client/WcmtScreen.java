@@ -21,6 +21,7 @@ import com.wcmt.menu.WcmtMenu;
 import com.wcmt.network.DriveSnapshotPayload;
 import com.wcmt.network.WcmtActionPayload;
 
+import de.mari_023.ae2wtlib.api.gui.ScrollingUpgradesPanel;
 import de.mari_023.ae2wtlib.api.terminal.IUniversalTerminalCapable;
 import de.mari_023.ae2wtlib.api.terminal.WTMenuHost;
 import net.minecraft.client.gui.GuiGraphics;
@@ -145,8 +146,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private final List<AppEngSlot> driveSlots = new ArrayList<>();
     private final Scrollbar scrollbar;
-    /** Upgrade slots, laid out in the column hanging off the sheet's right edge. */
-    private final UpgradesPanel upgradesPanel;
+    /** The wireless terminal's scrolling upgrade panel, or null for the cable-mounted part. */
+    @Nullable
+    private final ScrollingUpgradesPanel upgradesPanel;
+    /** The cable-mounted part's plain upgrade panel, or null for the wireless terminal. */
+    @Nullable
+    private final UpgradesPanel partUpgradesPanel;
 
     private int rows = MIN_ROWS;
     /** First content row of each visible drive. */
@@ -168,14 +173,20 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     public WcmtScreen(WcmtMenu menu, Inventory playerInventory, Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        // AE2's own panel, which lays out every slot the menu has. AE2WTlib's scrolling panel is
-        // deliberately not used here: it assumes the first slot is a singularity slot (true for the
-        // universal terminal) and skips it while it is empty, which would drop one of our slots.
-        var upgradeSlots = menu.getSlots(SlotSemantics.UPGRADE);
-        var host = menu.getWcmtHost();
-        this.upgradesPanel = host != null ? new UpgradesPanel(upgradeSlots, host)
-                : new UpgradesPanel(upgradeSlots);
-        widgets.add("upgrades", this.upgradesPanel);
+        // The wireless terminal uses AE2WTlib's scrolling panel, the same one the universal terminal
+        // uses: it expects the menu's slot list to start with the quantum-bridge singularity slot
+        // (which WcmtMenu provides) and keeps the column scrollable when there are more slots than
+        // fit. The cable-mounted part has no upgrade inventory at all, so it gets AE2's plain panel
+        // (which stays empty) to keep the sheet's upgrade column in place.
+        if (menu.getWcmtHost() != null) {
+            this.upgradesPanel = addUpgradePanel(widgets, menu);
+            this.partUpgradesPanel = null;
+        } else {
+            this.upgradesPanel = null;
+            var panel = new UpgradesPanel(menu.getSlots(SlotSemantics.UPGRADE));
+            widgets.add("upgrades", panel);
+            this.partUpgradesPanel = panel;
+        }
         // Only the universal terminal has other terminals to cycle through.
         if (menu.isWUT()) {
             addToLeftToolbar(cycleTerminalButton());
@@ -198,7 +209,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         positionPlayerInventory();
         // Hang the upgrade panel off the sheet's right edge, mirroring the terminal-height button
         // that AE2 attaches to the left edge of the panel.
-        upgradesPanel.setPosition(new Point(PANEL_WIDTH - 2, 0));
+        if (upgradesPanel != null) {
+            upgradesPanel.setPosition(new Point(PANEL_WIDTH - 2, 0));
+            upgradesPanel.setMaxRows(WcmtMenu.UPGRADE_SLOTS);
+        } else if (partUpgradesPanel != null) {
+            partUpgradesPanel.setPosition(new Point(PANEL_WIDTH - 2, 0));
+        }
         updateScrollbar();
         sendLayout(scrollOffset, rows);
     }

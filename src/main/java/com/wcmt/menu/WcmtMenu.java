@@ -117,6 +117,12 @@ public class WcmtMenu extends AEBaseMenu {
         // so the cable-mounted variant only gets the drive slots. Field order matters here — the host
         // check and getUpgrades() must not run for the part.
         if (this.host != null) {
+            // The quantum-bridge singularity slot must come first: AE2WTlib's upgrade panel treats the
+            // first slot of its list as the singularity slot and hides it while it is empty.
+            addSlot(new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.QE_SINGULARITY,
+                    this.host.getSubInventory(WTMenuHost.INV_SINGULARITY), 0),
+                    AE2wtlibSlotSemantics.SINGULARITY);
+
             var upgrades = this.host.getUpgrades();
             int slotCount = isWUT() ? upgrades.size() : Math.min(UPGRADE_SLOTS, upgrades.size());
             for (int i = 0; i < slotCount; i++) {

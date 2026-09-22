@@ -7,7 +7,7 @@
   ],
   "key": {
     "A": {
-      "item": "ae2:semi_dark_monitor"
+      "tag": "ae2:illuminated_panel"
     },
     "B": {
       "item": "ae2:engineering_processor"

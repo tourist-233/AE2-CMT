@@ -9,7 +9,6 @@ import appeng.api.config.TerminalStyle;
 import appeng.api.storage.cells.CellState;
 import appeng.client.Point;
 import appeng.client.gui.AEBaseScreen;
-import appeng.client.gui.Icon;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
@@ -52,6 +51,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private static final ResourceLocation CELL_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_interface.png");
+    /** 18x18 storage cell well drawn behind every content slot (16 px content plus a 1 px border). */
+    private static final ResourceLocation SLOT_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_slot.png");
 
     /** Width of the panel drawn from the sheet, its two border columns included. */
     private static final int PANEL_WIDTH = 209;
@@ -259,9 +261,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         driveSlots.clear();
         for (Slot slot : menu.getSlots(SlotSemantics.STORAGE_CELL)) {
             if (slot instanceof AppEngSlot appEngSlot) {
-                // The same background icon vanilla AE2 puts behind its own storage cell slots;
-                // AppEngSlot rendering draws it only while the slot is empty.
-                appEngSlot.setIcon(Icon.BACKGROUND_STORAGE_CELL);
                 driveSlots.add(appEngSlot);
             }
         }
@@ -471,6 +470,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             y += ROW_H;
         }
 
+        // Storage cell wells, only for the slots the current layout actually shows.
+        for (AppEngSlot slot : driveSlots) {
+            if (!slot.isActive() || slot.x < 0 || slot.y < 0) {
+                continue;
+            }
+            guiGraphics.blit(SLOT_TEXTURE, offsetX + slot.x - 1, offsetY + slot.y - 1, 0, 0, 18, 18, 18, 18);
+        }
+
         // The content area's own closing edge, then the inventory block (the sheet lays the two out
         // back to back, so they must not be shifted against each other).
         blit(guiGraphics, offsetX, y, 0, ROW_EDGE_V, PANEL_WIDTH, ROW_EDGE_H);
@@ -621,9 +628,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         // Only the content rows are dimmed; the sheet's middle panel and the inventory stay clear.
         int contentLeft = SLOT_X0;
         int contentRight = SLOT_X0 + SLOTS_PER_ROW * SLOT_STEP - 1;
-        guiGraphics.fill(contentLeft, contentTop(), contentRight, bottomTop(), 0x3F000000);
+        int shadeBottom = bottomTop() - 7;
+        guiGraphics.fill(contentLeft, contentTop(), contentRight, shadeBottom, 0x3F000000);
         guiGraphics.drawCenteredString(font, status, (contentLeft + contentRight) / 2,
-                (contentTop() + bottomTop()) / 2 - 4, 0xFFFF5555);
+                (contentTop() + shadeBottom) / 2 - 4, 0xFFFF5555);
     }
 
     private int slotIndexFor(int driveIndex, int local) {

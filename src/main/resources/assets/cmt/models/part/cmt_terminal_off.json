@@ -1,8 +1,8 @@
 {
   "textures": {
-    "lightsBright": "cmt:part/cmt_terminal_bright",
-    "lightsMedium": "cmt:part/cmt_terminal_medium",
-    "lightsDark": "cmt:part/cmt_terminal_dark"
+    "lightsBright": "cmt:part/component_management_terminal_bright",
+    "lightsMedium": "cmt:part/component_management_terminal_medium",
+    "lightsDark": "cmt:part/component_management_terminal_dark"
   },
   "elements": [
     {

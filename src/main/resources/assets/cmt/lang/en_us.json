@@ -11,5 +11,9 @@
   "gui.cmt.groove_storage_infinite": "Storage: unlimited",
   "gui.cmt.empty_slot": "Empty slot in %s",
   "key.ae2.wireless_cmt_terminal": "Open the Wireless Component Management Terminal",
-  "gui.cmt.terminal_title": "Component Management Terminal"
+  "gui.cmt.terminal_title": "Component Management Terminal",
+  "gui.cmt.sort": "Order: %s",
+  "gui.cmt.sort.position": "by position",
+  "gui.cmt.sort.name": "by name",
+  "gui.cmt.sort.usage": "by usage"
 }

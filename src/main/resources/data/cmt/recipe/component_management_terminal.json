@@ -1,21 +1,16 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "pattern": [
-    "A",
-    "B",
-    "C"
-  ],
-  "key": {
-    "A": {
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
       "tag": "ae2:illuminated_panel"
     },
-    "B": {
+    {
       "item": "ae2:engineering_processor"
     },
-    "C": {
+    {
       "item": "ae2:drive"
     }
-  },
+  ],
   "result": {
     "id": "cmt:component_management_terminal",
     "count": 1

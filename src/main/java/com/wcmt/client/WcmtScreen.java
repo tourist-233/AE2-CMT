@@ -10,6 +10,8 @@ import appeng.api.storage.cells.CellState;
 import appeng.client.Point;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.Icon;
+import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.client.gui.widgets.UpgradesPanel;
@@ -163,6 +165,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private DriveSnapshotPayload lastApplied;
     private int scrollOffset;
+    /** Client-side mirror of the server's drive ordering, so the sort button reacts immediately. */
+    private WcmtMenu.SortMode clientSortMode = WcmtMenu.SortMode.POSITION;
 
     /** Summed per-kind totals of the whole network, for the two grooves beside the inventory. */
     private long netTypes;
@@ -195,6 +199,40 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         }
         addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
+        addToLeftToolbar(new SortButton());
+    }
+
+    /**
+     * Cycles the drive ordering. Mirrored locally so the icon reacts immediately; the server remains
+     * authoritative and its next snapshot carries the same value back.
+     */
+    private void cycleSort() {
+        var modes = WcmtMenu.SortMode.values();
+        clientSortMode = modes[(clientSortMode.ordinal() + 1) % modes.length];
+        PacketDistributor.sendToServer(new WcmtActionPayload(
+                WcmtActionPayload.ACTION_SORT, clientSortMode.ordinal(), 0, ""));
+    }
+
+    /** Left-toolbar button that steps through the sort modes, using AE2's own sort icons. */
+    private final class SortButton extends IconButton {
+        SortButton() {
+            super(pressed -> cycleSort());
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return switch (clientSortMode) {
+                case POSITION -> Icon.SORT_BY_INVENTORY_TWEAKS;
+                case NAME -> Icon.SORT_BY_NAME;
+                case USAGE -> Icon.SORT_BY_AMOUNT;
+            };
+        }
+
+        @Override
+        public List<Component> getTooltipMessage() {
+            return List.of(Component.translatable("gui.cmt.sort",
+                    Component.translatable("gui.cmt.sort." + clientSortMode.name().toLowerCase(Locale.ROOT))));
+        }
     }
 
     // ------------------------------------------------------------------

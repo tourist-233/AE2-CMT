@@ -11,5 +11,9 @@
   "gui.cmt.groove_storage_infinite": "存储量：无限",
   "gui.cmt.empty_slot": "%s 的空槽位",
   "key.ae2.wireless_cmt_terminal": "打开无线元件管理终端",
-  "gui.cmt.terminal_title": "元件管理终端"
+  "gui.cmt.terminal_title": "元件管理终端",
+  "gui.cmt.sort": "排列顺序：%s",
+  "gui.cmt.sort.position": "按位置",
+  "gui.cmt.sort.name": "按名称",
+  "gui.cmt.sort.usage": "按占用率"
 }

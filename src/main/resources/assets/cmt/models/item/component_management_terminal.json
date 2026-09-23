@@ -1,11 +1,11 @@
 {
   "parent": "ae2:item/display_base",
   "textures": {
-    "front": "cmt:part/cmt_terminal_off",
-    "front_base": "cmt:part/cmt_terminal_off",
-    "front_bright": "cmt:part/cmt_terminal_blank",
-    "front_medium_bright": "cmt:part/cmt_terminal_blank",
-    "front_medium": "cmt:part/cmt_terminal_blank",
-    "front_dark": "cmt:part/cmt_terminal_blank"
+    "front": "cmt:part/component_management_terminal_off",
+    "front_base": "cmt:part/component_management_terminal_off",
+    "front_bright": "cmt:part/component_management_terminal_blank",
+    "front_medium_bright": "cmt:part/component_management_terminal_blank",
+    "front_medium": "cmt:part/component_management_terminal_blank",
+    "front_dark": "cmt:part/component_management_terminal_blank"
   }
 }

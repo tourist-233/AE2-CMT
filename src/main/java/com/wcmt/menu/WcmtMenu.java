@@ -1,6 +1,7 @@
 package com.wcmt.menu;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -11,9 +12,14 @@ import com.wcmt.network.WcmtActionPayload;
 
 import org.jetbrains.annotations.Nullable;
 
+import appeng.api.config.Setting;
+import appeng.api.config.Settings;
+import appeng.api.config.SortDir;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
-import appeng.api.storage.ILinkStatus;import appeng.blockentity.storage.DriveBlockEntity;
+import appeng.api.storage.ILinkStatus;
+import appeng.api.util.IConfigManager;
+import appeng.blockentity.storage.DriveBlockEntity;
 import appeng.core.localization.GuiText;
 import appeng.items.tools.powered.WirelessTerminalItem;
 import appeng.menu.AEBaseMenu;
@@ -61,6 +67,12 @@ public class WcmtMenu extends AEBaseMenu {
         USAGE
     }
 
+    /**
+     * Custom setting carried by the terminal itself (item NBT for the wireless one, part NBT for the
+     * cable terminal), so the chosen ordering survives closing and reopening the screen.
+     */
+    public static final Setting<SortMode> SORT_MODE = new Setting<>("cmt_sort_mode", SortMode.class);
+
     /** The wireless host, or null when this menu belongs to the cable-mounted part. */
     @Nullable
     private final WcmtMenuHost host;
@@ -84,7 +96,8 @@ public class WcmtMenu extends AEBaseMenu {
     /** Rows of the first visible drive that are scrolled off above the window. */
     private int skippedRows;
     private int rowsBudget = 4;
-    private SortMode sortMode = SortMode.POSITION;
+    /** Where the ordering lives: the wireless terminal's stack, or the cable part. */
+    private final IConfigManager sortConfig;
     private String search = "";
     private List<ManagedDrive> allDrives = List.of();
     private List<ManagedDrive> visibleDrives = List.of();
@@ -106,6 +119,14 @@ public class WcmtMenu extends AEBaseMenu {
         this.host = host instanceof WcmtMenuHost wireless ? wireless : null;
         this.part = host instanceof WcmtTerminalPart cablePart ? cablePart : null;
         this.serverSide = isServerSide();
+        // Ordering is kept in AE2's config manager, which persists onto whichever object hosts this
+        // terminal: the wireless stack or the cable part.
+        this.sortConfig = this.host != null
+                ? IConfigManager.builder(this.host::getItemStack)
+                        .registerSetting(SORT_MODE, SortMode.POSITION)
+                        .registerSetting(Settings.SORT_DIRECTION, SortDir.ASCENDING)
+                        .build()
+                : this.part.getConfigManager();
         this.driveInventory = new PagedDriveInventory(serverSide, this);
 
         for (int i = 0; i < MAX_SLOTS; i++) {
@@ -242,7 +263,11 @@ public class WcmtMenu extends AEBaseMenu {
                 rowsBudget = newRows;
             }
             case WcmtActionPayload.ACTION_SORT ->
-                sortMode = SortMode.values()[Math.floorMod(a, SortMode.values().length)];
+                sortConfig.putSetting(SORT_MODE,
+                        SortMode.values()[Math.floorMod(a, SortMode.values().length)]);
+            case WcmtActionPayload.ACTION_SORT_DIRECTION ->
+                sortConfig.putSetting(Settings.SORT_DIRECTION,
+                        a != 0 ? SortDir.DESCENDING : SortDir.ASCENDING);
             case WcmtActionPayload.ACTION_SEARCH -> search = text == null ? "" : text;
             default -> {
                 return;
@@ -298,7 +323,10 @@ public class WcmtMenu extends AEBaseMenu {
             needsTotals = false;
             summarizeNetwork(found);
         }
-        found.sort(comparatorFor(sortMode));
+        found.sort(comparatorFor(sortConfig.getSetting(SORT_MODE)));
+        if (sortConfig.getSetting(Settings.SORT_DIRECTION) == SortDir.DESCENDING) {
+            Collections.reverse(found);
+        }
         if (!search.isBlank()) {
             String query = search.toLowerCase(Locale.ROOT);
             found.removeIf(drive -> !matchesSearch(drive, query));
@@ -440,8 +468,9 @@ public class WcmtMenu extends AEBaseMenu {
         }
         PacketDistributor.sendToPlayer(serverPlayer,
                 new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked(),
-                        sortMode.name(), search, linkStatusMessage(), infos,
-                        netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite));
+                        sortConfig.getSetting(SORT_MODE).name(), search, linkStatusMessage(), infos,
+                        netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite,
+                        sortConfig.getSetting(Settings.SORT_DIRECTION) == SortDir.DESCENDING));
     }
 
     /** Empty while the terminal can reach the network, otherwise the reason it cannot. */

@@ -16,6 +16,7 @@ public record WcmtActionPayload(int action, int a, int b, String text) implement
     public static final int ACTION_LAYOUT = 0;
     public static final int ACTION_SORT = 1;
     public static final int ACTION_SEARCH = 2;
+    public static final int ACTION_SORT_DIRECTION = 3;
 
     public static final Type<WcmtActionPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID, "action"));

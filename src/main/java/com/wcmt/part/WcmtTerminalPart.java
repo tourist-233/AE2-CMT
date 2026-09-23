@@ -6,8 +6,10 @@ import com.wcmt.init.ModMenus;
 import appeng.api.parts.IPartItem;
 import appeng.api.parts.IPartModel;
 import appeng.api.parts.PartModels;
+import appeng.api.util.IConfigManagerBuilder;
 import appeng.parts.PartModel;
 import appeng.parts.reporting.AbstractTerminalPart;
+import com.wcmt.menu.WcmtMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
@@ -46,6 +48,13 @@ public class WcmtTerminalPart extends AbstractTerminalPart {
      */
     public static void registerModels() {
         PartModels.registerModels(MODEL_OFF, MODEL_ON);
+    }
+
+    @Override
+    protected void registerSettings(IConfigManagerBuilder builder) {
+        super.registerSettings(builder);
+        // The ordering key is ours; AE2's own SORT_DIRECTION gets registered by the superclass.
+        builder.registerSetting(WcmtMenu.SORT_MODE, WcmtMenu.SortMode.POSITION);
     }
 
     @Override

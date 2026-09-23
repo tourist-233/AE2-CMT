@@ -31,7 +31,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
-        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite)
+        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite, boolean sortDesc)
         implements CustomPacketPayload {
 
     /**
@@ -81,6 +81,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         buf.writeVarLong(p.byteUsed());
         buf.writeVarLong(p.byteTotal());
         buf.writeBoolean(p.infinite());
+        buf.writeBoolean(p.sortDesc());
     }
 
     private static DriveSnapshotPayload decode(RegistryFriendlyByteBuf buf) {
@@ -101,8 +102,9 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         long byteUsed = buf.readVarLong();
         long byteTotal = buf.readVarLong();
         boolean infinite = buf.readBoolean();
+        boolean sortDesc = buf.readBoolean();
         return new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked, sort, search,
-                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite);
+                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, sortDesc);
     }
 
     private static void encodeDrive(RegistryFriendlyByteBuf buf, DriveInfo d) {

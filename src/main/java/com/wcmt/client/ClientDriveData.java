@@ -70,6 +70,16 @@ public final class ClientDriveData {
         return snapshot != null && snapshot.infinite();
     }
 
+    /** Ordering key last reported by the server, used to initialise the sort button. */
+    public static WcmtMenu.SortMode sortMode() {
+        return snapshot == null ? WcmtMenu.SortMode.POSITION : WcmtMenu.SortMode.valueOf(snapshot.sort());
+    }
+
+    /** True when the server orders the drives bottom-to-top. */
+    public static boolean sortDescending() {
+        return snapshot != null && snapshot.sortDesc();
+    }
+
     private ClientDriveData() {
     }
 }

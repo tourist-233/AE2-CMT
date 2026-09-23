@@ -165,8 +165,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private DriveSnapshotPayload lastApplied;
     private int scrollOffset;
-    /** Client-side mirror of the server's drive ordering, so the sort button reacts immediately. */
+    /**
+     * Mirror of the ordering stored on the terminal itself. Rebuilt from every snapshot, so it also
+     * survives closing and reopening the screen.
+     */
     private WcmtMenu.SortMode clientSortMode = WcmtMenu.SortMode.POSITION;
+    private boolean clientSortDescending;
 
     /** Summed per-kind totals of the whole network, for the two grooves beside the inventory. */
     private long netTypes;
@@ -200,10 +204,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
         addToLeftToolbar(new SortButton());
+        addToLeftToolbar(new SortDirectionButton());
     }
 
     /**
-     * Cycles the drive ordering. Mirrored locally so the icon reacts immediately; the server remains
+     * Cycles the ordering key. Mirrored locally so the icon reacts immediately; the server stays
      * authoritative and its next snapshot carries the same value back.
      */
     private void cycleSort() {
@@ -213,7 +218,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 WcmtActionPayload.ACTION_SORT, clientSortMode.ordinal(), 0, ""));
     }
 
-    /** Left-toolbar button that steps through the sort modes, using AE2's own sort icons. */
+    /** Flips the ordering between top-to-bottom and bottom-to-top. */
+    private void cycleSortDirection() {
+        clientSortDescending = !clientSortDescending;
+        PacketDistributor.sendToServer(new WcmtActionPayload(
+                WcmtActionPayload.ACTION_SORT_DIRECTION, clientSortDescending ? 1 : 0, 0, ""));
+    }
+
+    /** Left-toolbar button that steps through the ordering keys, using AE2's own sort icons. */
     private final class SortButton extends IconButton {
         SortButton() {
             super(pressed -> cycleSort());
@@ -230,8 +242,27 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
         @Override
         public List<Component> getTooltipMessage() {
+            return List.of(Component.translatable("gui.cmt.order",
+                    Component.translatable("gui.cmt.order." + clientSortMode.name().toLowerCase(Locale.ROOT))));
+        }
+    }
+
+    /** Left-toolbar button that flips the ordering direction. */
+    private final class SortDirectionButton extends IconButton {
+        SortDirectionButton() {
+            super(pressed -> cycleSortDirection());
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return clientSortDescending ? Icon.ARROW_UP : Icon.ARROW_DOWN;
+        }
+
+        @Override
+        public List<Component> getTooltipMessage() {
             return List.of(Component.translatable("gui.cmt.sort",
-                    Component.translatable("gui.cmt.sort." + clientSortMode.name().toLowerCase(Locale.ROOT))));
+                    Component.translatable(clientSortDescending
+                            ? "gui.cmt.sort.descending" : "gui.cmt.sort.ascending")));
         }
     }
 
@@ -469,6 +500,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             applyLayout(data);
             scrollOffset = data == null ? 0 : data.offset();
             updateScrollbar();
+            // The ordering lives on the terminal, not in this screen, so adopt whatever the server
+            // reports: reopening the terminal then shows the key and direction it was left in.
+            clientSortMode = ClientDriveData.sortMode();
+            clientSortDescending = ClientDriveData.sortDescending();
         }
 
         int scrolled = scrollbar.getCurrentScroll();

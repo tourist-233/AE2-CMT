@@ -6,7 +6,6 @@ import java.util.Locale;
 
 import appeng.api.config.Settings;
 import appeng.api.config.TerminalStyle;
-import appeng.api.storage.cells.CellState;
 import appeng.client.Point;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
@@ -54,9 +53,24 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private static final ResourceLocation CELL_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_interface.png");
-    /** 18x18 storage cell well drawn behind every content slot (16 px content plus a 1 px border). */
-    private static final ResourceLocation SLOT_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_slot.png");
+    /**
+     * The terminal's own little art sheet: the storage-cell well, its capacity groove and the four
+     * state colours. Ordered like AE2's own {@code guis/states.png}, so sub-rects are addressed by
+     * source coordinates rather than by slicing it into separate files per element.
+     */
+    private static final ResourceLocation ICON =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/icon.png");
+    private static final int ICON_SIZE = 128;
+
+    /** The 18x18 well drawn around every content slot, and its 16x1 capacity groove near the bottom. */
+    private static final int SLOT_U = 0;
+    private static final int SLOT_V = 0;
+    private static final int SLOT_W = 18;
+    private static final int SLOT_H = 18;
+    private static final int SLOT_GROOVE_U = 1;
+    private static final int SLOT_GROOVE_V = 18;
+    private static final int SLOT_GROOVE_W = 16;
+    private static final int SLOT_GROOVE_H = 1;
     /** "By position" sort icon; the other two sort keys use AE2's own sprites. */
     private static final ResourceLocation SORT_POSITION_ICON =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_sort_position.png");
@@ -134,19 +148,20 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int MAX_ROWS = WcmtMenu.MAX_ROWS;
     private static final int HIDDEN = -9999;
 
-    /** Cached so the per-cell capacity bar doesn't clone the enum array every frame. */
-    private static final CellState[] CELL_STATES = CellState.values();
-
     /** Pre-built name+caption line per visible drive; rebuilt whenever a snapshot arrives. */
     private Component[] driveHeaders = new Component[0];
 
+    /**
+     * Fill colours, sampled from the art sheet's own swatches. Both the per-slot capacity groove and
+     * the network-wide progress grooves use the same scale: unlimited, nearly full, half, plenty.
+     */
     private static final int STORAGE_COLOR_EMPTY = 0x7A7F92;
-    private static final int STORAGE_COLOR_LOW = 0x3F8F3F;
-    private static final int STORAGE_COLOR_MEDIUM = 0xBC8A2A;
-    private static final int STORAGE_COLOR_HIGH = 0xB04545;
+    private static final int STORAGE_COLOR_LOW = 0x46FA3D;
+    private static final int STORAGE_COLOR_MEDIUM = 0xFA7C3D;
+    private static final int STORAGE_COLOR_HIGH = 0xFF2427;
 
     /** Unlimited capacity (a cell that reports infinite bytes, or NeoECO's infinite mode). */
-    private static final int INFINITE_COLOR = 0xFFCB61F6;
+    private static final int INFINITE_COLOR = 0xFFD73DFA;
 
     // ------------------------------------------------------------------
     // State
@@ -316,7 +331,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     /** Places the scrollbar on the pre-baked track and sizes it to the content rows. */
     private void updateScrollbar() {
-        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop()));
+        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop() - 2));
         scrollbar.setHeight(rows * ROW_H);
         scrollbar.setRange(0, Math.max(0, ClientDriveData.totalRows() - rows), 1);
         scrollbar.setCurrentScroll(scrollOffset);
@@ -567,12 +582,21 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             y += ROW_H;
         }
 
-        // Storage cell wells, only for the slots the current layout actually shows.
+        // Storage cell wells, only for the slots the current layout actually shows. The well and its
+        // groove are two sub-rects of the same sheet; the well keeps the 16x16 cell area aligned with
+        // the slot's own origin, and the groove sits inside the row so neighbouring wells never touch.
         for (AppEngSlot slot : driveSlots) {
             if (!slot.isActive() || slot.x < 0 || slot.y < 0) {
                 continue;
             }
-            guiGraphics.blit(SLOT_TEXTURE, offsetX + slot.x - 1, offsetY + slot.y - 1, 0, 0, 18, 18, 18, 18);
+            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                    .src(SLOT_U, SLOT_V, SLOT_W, SLOT_H)
+                    .dest(offsetX + slot.x - 1, offsetY + slot.y - 1)
+                    .blit(guiGraphics);
+            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                    .src(SLOT_GROOVE_U, SLOT_GROOVE_V, SLOT_GROOVE_W, SLOT_GROOVE_H)
+                    .dest(offsetX + slot.x, offsetY + slot.y + 16)
+                    .blit(guiGraphics);
         }
 
         // The content area's own closing edge, then the inventory block (the sheet lays the two out
@@ -762,14 +786,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 .withStyle(Style.EMPTY.withColor(TextColor.fromRgb(storageColor(used, total))));
     }
 
-    /** Drawn along the bottom edge of the cell, so it never covers the cell icon. */
+    /** Drawn inside the well's own groove, so it never covers the cell icon. */
     private void drawCapacityBar(GuiGraphics guiGraphics, int x, int y, DriveSnapshotPayload.SlotStat stat) {
-        // As wide as the slot icon, so the bar never reaches into the next column.
         int width = SLOT_STEP - 2;
-        guiGraphics.fill(x, y, x + width, y + 2, 0x66202020);
         if (stat.infinite()) {
-            // Unlimited capacity: always a full purple bar.
-            guiGraphics.fill(x, y, x + width, y + 2, INFINITE_COLOR);
+            guiGraphics.fill(x, y, x + width, y + 1, INFINITE_COLOR);
             return;
         }
         int filled = stat.total() > 0
@@ -777,8 +798,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 : 0;
         filled = Math.max(0, Math.min(width, filled));
         if (filled > 0) {
-            int color = CELL_STATES[Math.floorMod(stat.state(), CELL_STATES.length)].getStateColor();
-            guiGraphics.fill(x, y, x + filled, y + 2, color | 0xFF000000);
+            guiGraphics.fill(x, y, x + filled, y + 1, storageColor(stat.used(), stat.total()) | 0xFF000000);
         }
     }
 

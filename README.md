@@ -8,11 +8,10 @@
 
 终端有两种形态，功能一致：
 
-| 形态 | 物品 ID | 说明 |
-| --- | --- | --- |
-| **无线元件管理终端** | `cmt:wireless_component_management_terminal` | 手持式，需绑定无线访问点，消耗 AE 能量（可插能源卡扩容，4 个升级槽） |
-| **ME元件管理终端** | `cmt:component_management_terminal` | 线缆部件，占用一个频道，权限跟随 AE2 网络安全机制 |
-
+| 形态 | 说明 |
+| --- | --- |
+| **ME元件管理终端** | 线缆部件，占用一个频道，权限跟随 AE2 网络安全机制 |
+| **无线元件管理终端** | 手持式，需绑定无线访问点，消耗 AE 能量 |
 ---
 
 ## 功能
@@ -27,25 +26,25 @@
 
 ## 支持的驱动器
 
-* **AE2 本体**：ME 驱动器（10 槽）—— 完整支持
-* **NeoECO AE Extension**：**LD 存储矩阵驱动器**（多方块，按集群合并为一条记录）—— 支持
-  * 可选模组，未安装时无任何影响；通过反射桥接，无编译期依赖
+* **应用能源2**：ME驱动器
+* **Extended AE**：ME扩展驱动器
+* **NeoECO AE Extension**：LD存储矩阵驱动器
 ---
 
 ## 依赖
 
 必需：Minecraft **1.21.1**、NeoForge **21.1.230+**（AE2 本身要求 21.1.169 以上）、Applied Energistics 2 **19.2.17+**
 
-可选：[AE2WTlib](https://github.com/Mari023/AE2WirelessTerminalLibrary) **19.5.0+** —— 提供通用终端集成（其 API 已通过 jarJar 内嵌，不装也能正常使用）
-
+可选：[AE2WTlib](https://github.com/Mari023/AE2WirelessTerminalLibrary) **19.5.0+**
+     [NeoECO AE Extension](https://github.com/DancingSnow0517/NeoECOAEExtension) **21.1.0+**
 ---
 
 ## 安装与使用
 
 放入 `mods/` 目录即可，两个终端物品都出现在 AE2 的创造模式物品页。
 
-* **无线版**：先绑定无线访问点（与 AE2 无线终端方式相同），再手持右键打开；未绑定、超范围或没电时界面会提示原因
 * **部件版**：贴在 ME 线缆上（占一个频道），右键打开
+* **无线版**：先绑定无线访问点（与 AE2 无线终端方式相同），再手持右键打开；未绑定、超范围或没电时界面会提示原因
 
 ---
 ## 构建

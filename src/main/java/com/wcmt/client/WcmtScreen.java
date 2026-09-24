@@ -11,6 +11,7 @@ import appeng.client.Point;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.Icon;
+import appeng.client.gui.style.Blitter;
 import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
@@ -56,6 +57,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** 18x18 storage cell well drawn behind every content slot (16 px content plus a 1 px border). */
     private static final ResourceLocation SLOT_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_slot.png");
+    /** "By position" sort icon; the other two sort keys use AE2's own sprites. */
+    private static final ResourceLocation SORT_POSITION_ICON =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_sort_position.png");
 
     /** Width of the panel drawn from the sheet, its two border columns included. */
     private static final int PANEL_WIDTH = 209;
@@ -225,7 +229,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 WcmtActionPayload.ACTION_SORT_DIRECTION, clientSortDescending ? 1 : 0, 0, ""));
     }
 
-    /** Left-toolbar button that steps through the ordering keys, using AE2's own sort icons. */
+    /** Left-toolbar button that steps through the ordering keys, using AE2's own sort sprites. */
     private final class SortButton extends IconButton {
         SortButton() {
             super(pressed -> cycleSort());
@@ -234,16 +238,35 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         @Override
         protected Icon getIcon() {
             return switch (clientSortMode) {
-                case POSITION -> Icon.SORT_BY_INVENTORY_TWEAKS;
+                case POSITION -> null;
                 case NAME -> Icon.SORT_BY_NAME;
                 case USAGE -> Icon.SORT_BY_AMOUNT;
             };
         }
 
         @Override
+        public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
+            // The "by position" icon has no AE2 sprite of its own, so it is drawn from our own texture
+            // at the same offset and z the base class uses for its icons.
+            if (clientSortMode == WcmtMenu.SortMode.POSITION) {
+                Blitter.texture(SORT_POSITION_ICON, 16, 16)
+                        .src(0, 0, 16, 16)
+                        .dest(getX(), getY() + 1 + (isHovered() ? 1 : 0))
+                        .zOffset(3)
+                        .blit(guiGraphics);
+            }
+        }
+
+        @Override
         public List<Component> getTooltipMessage() {
-            return List.of(Component.translatable("gui.cmt.order",
-                    Component.translatable("gui.cmt.order." + clientSortMode.name().toLowerCase(Locale.ROOT))));
+            return List.of(
+                    Component.translatable("gui.tooltips.ae2.SortBy"),
+                    switch (clientSortMode) {
+                        case POSITION -> Component.translatable("gui.cmt.sort.position");
+                        case NAME -> Component.translatable("gui.tooltips.ae2.ItemName");
+                        case USAGE -> Component.translatable("gui.tooltips.ae2.NumberOfItems");
+                    });
         }
     }
 
@@ -260,9 +283,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
         @Override
         public List<Component> getTooltipMessage() {
-            return List.of(Component.translatable("gui.cmt.sort",
+            return List.of(
+                    Component.translatable("gui.tooltips.ae2.SortOrder"),
                     Component.translatable(clientSortDescending
-                            ? "gui.cmt.sort.descending" : "gui.cmt.sort.ascending")));
+                            ? "gui.tooltips.ae2.Descending" : "gui.tooltips.ae2.Ascending"));
         }
     }
 

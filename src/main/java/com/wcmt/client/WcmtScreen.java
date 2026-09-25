@@ -363,7 +363,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop() - 2));
         // The handle's track is the whole groove, so it can reach both ends without a gap.
         scrollbar.setHeight(INV_H);
-        scrollbar.setRange(0, Math.max(0, ClientDriveData.totalRows() - rows), 1);
+        // Use the row count the server actually rendered with; our own estimate can differ and would
+        // then let the scrollbar overshoot the end (or stop halfway).
+        int windowRows = Math.max(1, ClientDriveData.windowRows());
+        scrollbar.setRange(0, Math.max(0, ClientDriveData.totalRows() - windowRows), 1);
         // Only seed the handle while it is still untouched; afterwards it belongs to the player, and
         // overwriting it here would undo whatever they just scrolled to.
         if (lastRequestedScroll < 0) {
@@ -680,11 +683,15 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         blit(guiGraphics, offsetX, y + INV_H, 0, BOTTOM_V, PANEL_WIDTH, BOTTOM_H);
     }
 
-    /** Slot contents slide with the rest of the row, while the slot itself stays snapped. */
+    /**
+     * Slot contents slide with the rest of the row, while the slot itself stays snapped. Only the
+     * drive slots take part: the player inventory must stay put, or the whole screen looks like it
+     * is jittering while scrolling.
+     */
     @Override
     public void renderSlot(GuiGraphics guiGraphics, net.minecraft.world.inventory.Slot slot) {
         float shift = scrollShift();
-        if (shift != 0f) {
+        if (shift != 0f && slot instanceof AppEngSlot engSlot && driveSlots.contains(engSlot)) {
             guiGraphics.pose().pushPose();
             guiGraphics.pose().translate(0f, shift, 0f);
             super.renderSlot(guiGraphics, slot);

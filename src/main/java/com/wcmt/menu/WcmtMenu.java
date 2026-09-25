@@ -253,8 +253,11 @@ public class WcmtMenu extends AEBaseMenu {
         }
         switch (action) {
             case WcmtActionPayload.ACTION_LAYOUT -> {
-                int newOffset = a;
                 int newRows = Math.max(1, Math.min(MAX_ROWS, b));
+                // Clamp against what the last scan found, so a stale scroll range on the client can
+                // never push the window past the end of the content.
+                int maxOffset = Math.max(0, totalRows - newRows);
+                int newOffset = Math.max(0, Math.min(a, maxOffset));
                 if (newOffset == offset && newRows == rowsBudget) {
                     // Nothing changed: don't trigger another full scan and snapshot.
                     return;
@@ -466,8 +469,9 @@ public class WcmtMenu extends AEBaseMenu {
         for (ManagedDrive drive : visibleDrives) {
             infos.add(buildInfo(drive));
         }
+        int windowRows = Math.max(1, Math.min(MAX_ROWS, rowsBudget));
         PacketDistributor.sendToPlayer(serverPlayer,
-                new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked(),
+                new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked(),
                         sortConfig.getSetting(SORT_MODE).name(), search, linkStatusMessage(), infos,
                         netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite,
                         sortConfig.getSetting(Settings.SORT_DIRECTION) == SortDir.DESCENDING));

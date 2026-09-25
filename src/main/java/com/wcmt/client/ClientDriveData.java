@@ -34,6 +34,11 @@ public final class ClientDriveData {
         return snapshot == null ? 0 : snapshot.totalRows();
     }
 
+    /** Rows the server is currently showing; the scroll range has to use this, not our own guess. */
+    public static int windowRows() {
+        return snapshot == null ? 0 : snapshot.windowRows();
+    }
+
     /** Empty while the terminal is usable, otherwise why it cannot reach the network. */
     public static Component status() {
         return snapshot == null ? Component.empty() : snapshot.status();

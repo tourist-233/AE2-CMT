@@ -29,7 +29,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * window. {@code blocked} tells the client that the terminal cannot be used right now (unlinked, out
  * of range, out of power or nothing fits) and {@code status} is the text to show for it.
  */
-public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
+public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, int windowRows,
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
         long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite, boolean sortDesc)
         implements CustomPacketPayload {
@@ -68,6 +68,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         buf.writeVarInt(p.offset);
         buf.writeVarInt(p.totalRows);
         buf.writeVarInt(p.skippedRows);
+        buf.writeVarInt(p.windowRows);
         buf.writeBoolean(p.blocked);
         buf.writeUtf(p.sort);
         buf.writeUtf(p.search);
@@ -88,6 +89,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         int offset = buf.readVarInt();
         int totalRows = buf.readVarInt();
         int skippedRows = buf.readVarInt();
+        int windowRows = buf.readVarInt();
         boolean blocked = buf.readBoolean();
         String sort = buf.readUtf();
         String search = buf.readUtf();
@@ -103,7 +105,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows,
         long byteTotal = buf.readVarLong();
         boolean infinite = buf.readBoolean();
         boolean sortDesc = buf.readBoolean();
-        return new DriveSnapshotPayload(offset, totalRows, skippedRows, blocked, sort, search,
+        return new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked, sort, search,
                 status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, sortDesc);
     }
 

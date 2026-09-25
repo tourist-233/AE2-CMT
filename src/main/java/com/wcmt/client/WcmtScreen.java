@@ -360,9 +360,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     /** Places the scrollbar on the pre-baked track and sizes it to the content rows. */
     private void updateScrollbar() {
-        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop() - 2));
-        // The handle's track is the whole groove, so it can reach both ends without a gap.
-        scrollbar.setHeight(INV_H);
+        // The groove beside the content rows is exactly rows*ROW_H tall (the sheet breaks it at the
+        // closing edge below), so the handle travels from the first to the last visible row and no
+        // further. Running it over the inventory block would make the handle leave the groove.
+        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop()));
+        scrollbar.setHeight(rows * ROW_H);
         // Use the row count the server actually rendered with; our own estimate can differ and would
         // then let the scrollbar overshoot the end (or stop halfway).
         int windowRows = Math.max(1, ClientDriveData.windowRows());
@@ -375,9 +377,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         scrollbar.setVisible(true);
     }
 
-    /** How far the content is currently drawn from its snapped position, in pixels. */
+    /**
+     * How far the content is currently drawn from its snapped position, in pixels. The content is
+     * already laid out for {@code scrollOffset}, so to make it look like it is still at
+     * {@code smoothOffset} the offset has to go the other way.
+     */
     private float scrollShift() {
-        return (smoothOffset - scrollOffset) * ROW_H;
+        return (scrollOffset - smoothOffset) * ROW_H;
     }
 
     /** header + rows * rowHeight + bottom; the row count follows the window and terminal style. */

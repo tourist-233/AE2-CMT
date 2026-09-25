@@ -147,6 +147,15 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int BAR_V = 152;
     private static final int BAR_W = 8;
     private static final int BAR_H = 72;
+    /**
+     * The sheet's four 8px-wide vertical strips (y 13..88), one per state. The progress grooves
+     * show them directly instead of a flat colour, so their shading pattern comes from the art.
+     */
+    private static final int BAR_STRIP_BOTTOM = 89;
+    private static final int BAR_U_UNLIMITED = 93;
+    private static final int BAR_U_FULL = 102;
+    private static final int BAR_U_HALF = 111;
+    private static final int BAR_U_LOW = 120;
 
     /** AE2's scrollbar handle is centred on the sheet's right-hand groove (x 194..201). */
     private static final int SCROLLBAR_X = 192;
@@ -689,10 +698,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     }
 
     private void drawProgressBar(GuiGraphics guiGraphics, int x, long used, long total) {
-        int bottom = inventoryTop() + BAR_V - INV_V + BAR_H;
+        int top = inventoryTop() + BAR_V - INV_V;
         if (netInfinite) {
-            // Unlimited storage has no ratio to show: a full groove in the unlimited colour.
-            guiGraphics.fill(x, bottom - BAR_H, x + BAR_W, bottom, INFINITE_COLOR);
+            // Unlimited storage has no ratio to show: the whole groove in the unlimited strip.
+            drawBarStrip(guiGraphics, x, top, BAR_U_UNLIMITED, BAR_H);
             return;
         }
         if (total <= 0) {
@@ -700,9 +709,27 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         }
         // At least a sliver, so an empty network still shows where the groove is.
         int filled = (int) Math.max(1, Math.min(BAR_H, used * BAR_H / total));
-        // storageColor carries no alpha; the groove fill needs an opaque colour.
-        guiGraphics.fill(x, bottom - filled, x + BAR_W, bottom,
-                storageColor(used, total) | 0xFF000000);
+        drawBarStrip(guiGraphics, x, top + (BAR_H - filled), barStripU(used, total), filled);
+    }
+
+    /** Paints {@code height} rows of one of the sheet's state strips, growing from the bottom up. */
+    private static void drawBarStrip(GuiGraphics guiGraphics, int x, int y, int u, int height) {
+        Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                .src(u, BAR_STRIP_BOTTOM - height, BAR_W, height)
+                .dest(x, y)
+                .blit(guiGraphics);
+    }
+
+    /** Picks the strip whose state matches how full the network is. */
+    private static int barStripU(long used, long total) {
+        if (total <= 0) {
+            return BAR_U_LOW;
+        }
+        double ratio = (double) used / total;
+        if (ratio < 0.5) {
+            return BAR_U_LOW;
+        }
+        return ratio < 0.9 ? BAR_U_HALF : BAR_U_FULL;
     }
 
     /**

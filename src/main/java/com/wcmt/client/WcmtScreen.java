@@ -360,11 +360,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     /** Places the scrollbar on the pre-baked track and sizes it to the content rows. */
     private void updateScrollbar() {
-        // The groove beside the content rows is exactly rows*ROW_H tall (the sheet breaks it at the
-        // closing edge below), so the handle travels from the first to the last visible row and no
-        // further. Running it over the inventory block would make the handle leave the groove.
-        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop()));
-        scrollbar.setHeight(rows * ROW_H);
+        // The groove beside the content rows runs from the two shading rows above the first row down
+        // to the closing edge, so the track starts 2 px higher and stays rows*ROW_H + 2 tall.
+        scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop() - 2));
+        scrollbar.setHeight(rows * ROW_H + 2);
         // Use the row count the server actually rendered with; our own estimate can differ and would
         // then let the scrollbar overshoot the end (or stop halfway).
         int windowRows = Math.max(1, ClientDriveData.windowRows());
@@ -384,6 +383,22 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      */
     private float scrollShift() {
         return (scrollOffset - smoothOffset) * ROW_H;
+    }
+
+    // TEMPORARY diagnostics for the scroll jitter.
+    private float dbgLastShift = Float.NaN;
+    private int dbgFrames;
+
+    private void dbgCheck(String where, float shift) {
+        dbgFrames++;
+        if (!Float.isNaN(dbgLastShift) && Math.abs(dbgLastShift - shift) > 0.01f) {
+            com.wcmt.WcmtMod.LOGGER.info(
+                    "CMT scroll {}: shift {}->{} scroll={} smooth={} rows={} total={} win={} off={}",
+                    where, dbgLastShift, shift, scrollOffset, smoothOffset, rows,
+                    ClientDriveData.totalRows(), ClientDriveData.windowRows(),
+                    ClientDriveData.get() == null ? -1 : ClientDriveData.get().offset());
+        }
+        dbgLastShift = shift;
     }
 
     /** header + rows * rowHeight + bottom; the row count follows the window and terminal style. */
@@ -638,12 +653,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         blit(guiGraphics, offsetX, offsetY, 0, HEADER_V, PANEL_WIDTH, HEADER_H);
 
         int y = offsetY + contentTop();
-        // Content slides by the easing offset; the panel art and the surrounding bars do not move.
-        float shift = scrollShift();
-        if (shift != 0f) {
-            guiGraphics.pose().pushPose();
-            guiGraphics.pose().translate(0f, shift, 0f);
-        }
+        // The row band stays put: sliding it would uncover the panel's shading rows above the first
+        // row and read as the whole area jerking. Only the slots and their contents move.
         for (int row = 0; row < rows; row++) {
             blit(guiGraphics, offsetX, y, 0, ROW_V, ROW_W, ROW_H);
             y += ROW_H;
@@ -652,7 +663,15 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         // Storage cell wells. An 18x20 well is exactly one row tall, so wells never overlap; the
         // bottom two well rows are then overwritten with the capacity groove (grey base, black
         // frame) the fill colour is painted into. Both only show for slots that actually hold a
-        // cell.
+        // cell. Clipped to the row band so a well sliding through cannot spill past it.
+        guiGraphics.enableScissor(offsetX + SLOT_X0 - 1, offsetY + contentTop(),
+                offsetX + PANEL_WIDTH - SLOT_X0 + 1, offsetY + bottomTop());
+        float shift = scrollShift();
+        dbgCheck("bg", shift);
+        if (shift != 0f) {
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(0f, shift, 0f);
+        }
         for (AppEngSlot slot : driveSlots) {
             if (!slot.isActive() || slot.x < 0 || slot.y < 0) {
                 continue;
@@ -672,6 +691,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (shift != 0f) {
             guiGraphics.pose().popPose();
         }
+        guiGraphics.disableScissor();
 
         // Those wells span the slot columns exactly, so they cover the content area's own left and
         // right edge lines; draw the two lines back on top.
@@ -698,10 +718,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     public void renderSlot(GuiGraphics guiGraphics, net.minecraft.world.inventory.Slot slot) {
         float shift = scrollShift();
         if (shift != 0f && slot instanceof AppEngSlot engSlot && driveSlots.contains(engSlot)) {
+            guiGraphics.enableScissor(leftPos + SLOT_X0 - 1, topPos + contentTop(),
+                    leftPos + PANEL_WIDTH - SLOT_X0 + 1, topPos + bottomTop());
             guiGraphics.pose().pushPose();
             guiGraphics.pose().translate(0f, shift, 0f);
             super.renderSlot(guiGraphics, slot);
             guiGraphics.pose().popPose();
+            guiGraphics.disableScissor();
             return;
         }
         super.renderSlot(guiGraphics, slot);
@@ -713,6 +736,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         boolean blocked = ClientDriveData.blocked();
 
         float shift = scrollShift();
+        dbgCheck("fg", shift);
+        guiGraphics.enableScissor(offsetX + SLOT_X0 - 1, offsetY + contentTop(),
+                offsetX + PANEL_WIDTH - SLOT_X0 + 1, offsetY + bottomTop());
         if (shift != 0f) {
             guiGraphics.pose().pushPose();
             guiGraphics.pose().translate(0f, shift, 0f);
@@ -749,6 +775,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (shift != 0f) {
             guiGraphics.pose().popPose();
         }
+        guiGraphics.disableScissor();
 
         drawProgressBars(guiGraphics);
         drawLinkStatus(guiGraphics);

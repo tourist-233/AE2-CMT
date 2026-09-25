@@ -144,9 +144,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      */
     private static final int TYPE_BAR_X = 177;
     private static final int STORAGE_BAR_X = 194;
-    private static final int BAR_V = 152;
+    /**
+     * The groove runs the full height of the inventory block (sheet y150..223), so a filled groove
+     * reaches both ends without a gap.
+     */
+    private static final int BAR_V = 150;
     private static final int BAR_W = 8;
-    private static final int BAR_H = 72;
+    private static final int BAR_H = 74;
     /**
      * The sheet's four 8px-wide vertical strips (y 13..88), one per state. The progress grooves
      * show them directly instead of a flat colour, so their shading pattern comes from the art.
@@ -157,8 +161,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int BAR_U_HALF = 111;
     private static final int BAR_U_LOW = 120;
 
-    /** AE2's scrollbar handle is centred on the sheet's right-hand groove (x 194..201). */
-    private static final int SCROLLBAR_X = 192;
+    /** AE2's scrollbar handle runs down the sheet's right-hand groove (x 194..201). */
+    private static final int SCROLLBAR_X = 191;
 
     /** Smallest content-row budget the panel may shrink to; the drawn row count can be lower. */
     private static final int MIN_ROWS = 4;
@@ -201,6 +205,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private DriveSnapshotPayload lastApplied;
     private int scrollOffset;
+    /**
+     * Row offset used while drawing: eases toward {@link #scrollOffset} so a wheel step animates
+     * instead of jumping a whole row at once. Slot positions themselves stay on whole rows, so
+     * clicks keep landing where they should.
+     */
+    private float smoothOffset;
     /**
      * Mirror of the ordering stored on the terminal itself. Rebuilt from every snapshot, so it also
      * survives closing and reopening the screen.
@@ -349,10 +359,16 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** Places the scrollbar on the pre-baked track and sizes it to the content rows. */
     private void updateScrollbar() {
         scrollbar.setPosition(new Point(SCROLLBAR_X, contentTop() - 2));
-        scrollbar.setHeight(rows * ROW_H);
+        // The handle's track is the whole groove, so it can reach both ends without a gap.
+        scrollbar.setHeight(INV_H);
         scrollbar.setRange(0, Math.max(0, ClientDriveData.totalRows() - rows), 1);
         scrollbar.setCurrentScroll(scrollOffset);
         scrollbar.setVisible(true);
+    }
+
+    /** How far the content is currently drawn from its snapped position, in pixels. */
+    private float scrollShift() {
+        return (smoothOffset - scrollOffset) * ROW_H;
     }
 
     /** header + rows * rowHeight + bottom; the row count follows the window and terminal style. */
@@ -567,6 +583,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             scrollOffset = scrolled;
             sendLayout(scrolled, rows);
         }
+        // Ease the drawing offset toward the target row so a wheel step slides instead of jumping.
+        smoothOffset += (scrollOffset - smoothOffset) * 0.2f;
+        if (Math.abs(scrollOffset - smoothOffset) < 0.02f) {
+            smoothOffset = scrollOffset;
+        }
     }
 
     private void toggleTerminalStyle(SettingToggleButton<TerminalStyle> button, boolean backwards) {
@@ -594,6 +615,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         blit(guiGraphics, offsetX, offsetY, 0, HEADER_V, PANEL_WIDTH, HEADER_H);
 
         int y = offsetY + contentTop();
+        // Content slides by the easing offset; the panel art and the surrounding bars do not move.
+        float shift = scrollShift();
+        if (shift != 0f) {
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(0f, shift, 0f);
+        }
         for (int row = 0; row < rows; row++) {
             blit(guiGraphics, offsetX, y, 0, ROW_V, ROW_W, ROW_H);
             y += ROW_H;
@@ -619,6 +646,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             }
         }
 
+        if (shift != 0f) {
+            guiGraphics.pose().popPose();
+        }
+
         // Those wells span the slot columns exactly, so they cover the content area's own left and
         // right edge lines; draw the two lines back on top.
         int edgeTop = offsetY + contentTop();
@@ -635,10 +666,30 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         blit(guiGraphics, offsetX, y + INV_H, 0, BOTTOM_V, PANEL_WIDTH, BOTTOM_H);
     }
 
+    /** Slot contents slide with the rest of the row, while the slot itself stays snapped. */
+    @Override
+    public void renderSlot(GuiGraphics guiGraphics, net.minecraft.world.inventory.Slot slot) {
+        float shift = scrollShift();
+        if (shift != 0f) {
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(0f, shift, 0f);
+            super.renderSlot(guiGraphics, slot);
+            guiGraphics.pose().popPose();
+            return;
+        }
+        super.renderSlot(guiGraphics, slot);
+    }
+
     @Override
     public void drawFG(GuiGraphics guiGraphics, int offsetX, int offsetY, int mouseX, int mouseY) {
         List<DriveSnapshotPayload.DriveInfo> drives = ClientDriveData.drives();
         boolean blocked = ClientDriveData.blocked();
+
+        float shift = scrollShift();
+        if (shift != 0f) {
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(0f, shift, 0f);
+        }
 
         for (int k = 0; k < drives.size() && !blocked && k < driveRowStart.length; k++) {
             DriveSnapshotPayload.DriveInfo info = drives.get(k);
@@ -666,6 +717,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                     drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 4, info.slots().get(local));
                 }
             }
+        }
+
+        if (shift != 0f) {
+            guiGraphics.pose().popPose();
         }
 
         drawProgressBars(guiGraphics);

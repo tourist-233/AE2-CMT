@@ -591,20 +591,23 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         }
 
         // Storage cell wells. An 18x20 well is exactly one row tall, so wells never overlap; the
-        // sheet's bottom two well rows are then overwritten with the capacity groove (grey base,
-        // black frame) that the fill colour is painted into.
+        // bottom two well rows are then overwritten with the capacity groove (grey base, black
+        // frame) the fill colour is painted into. Both only show for slots that actually hold a
+        // cell.
         for (AppEngSlot slot : driveSlots) {
             if (!slot.isActive() || slot.x < 0 || slot.y < 0) {
                 continue;
             }
-                int sx = offsetX + slot.x;
-                int sy = offsetY + slot.y;
-                Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
-                        .src(SLOT_U, SLOT_V, SLOT_W, SLOT_H)
-                        .dest(sx - 1, sy - 1)
-                        .blit(guiGraphics);
-                guiGraphics.fill(sx, sy + SLOT_H - 3, sx + SLOT_W - 2, sy + SLOT_H - 2, GROOVE_GRAY);
-                guiGraphics.fill(sx, sy + SLOT_H - 2, sx + SLOT_W - 2, sy + SLOT_H - 1, GROOVE_BLACK);
+            int sx = offsetX + slot.x;
+            int sy = offsetY + slot.y;
+            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                    .src(SLOT_U, SLOT_V, SLOT_W, SLOT_H)
+                    .dest(sx - 1, sy - 1)
+                    .blit(guiGraphics);
+            if (!slot.getItem().isEmpty()) {
+                guiGraphics.fill(sx, sy + SLOT_H - 4, sx + SLOT_W - 2, sy + SLOT_H - 3, GROOVE_GRAY);
+                guiGraphics.fill(sx, sy + SLOT_H - 3, sx + SLOT_W - 2, sy + SLOT_H - 2, GROOVE_BLACK);
+            }
         }
 
         // Those wells span the slot columns exactly, so they cover the content area's own left and
@@ -651,7 +654,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                     continue;
                 }
                 if (!slot.getItem().isEmpty()) {
-                    drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 3, info.slots().get(local));
+                    drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 4, info.slots().get(local));
                 }
             }
         }

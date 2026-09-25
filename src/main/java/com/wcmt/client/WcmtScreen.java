@@ -54,26 +54,34 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final ResourceLocation CELL_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_interface.png");
     /**
-     * The terminal's own little art sheet: the storage-cell well, its capacity groove and the four
-     * state colours. Ordered like AE2's own {@code guis/states.png}, so sub-rects are addressed by
-     * source coordinates rather than by slicing it into separate files per element.
+     * The terminal's own little art sheet: the storage-cell well, the sort icon and the four state
+     * colours. Ordered like AE2's own {@code guis/states.png}, so sub-rects are addressed by source
+     * coordinates rather than by slicing it into separate files per element.
      */
     private static final ResourceLocation ICON =
             ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/icon.png");
     private static final int ICON_SIZE = 128;
 
-    /** The 18x18 well drawn around every content slot, and its 16x1 capacity groove near the bottom. */
+    /**
+     * The 18x20 well drawn around every content slot. Its height matches {@link #ROW_H}, so a whole
+     * well fits one row and neighbours never overlap.
+     */
     private static final int SLOT_U = 0;
     private static final int SLOT_V = 0;
     private static final int SLOT_W = 18;
-    private static final int SLOT_H = 18;
-    private static final int SLOT_GROOVE_U = 1;
-    private static final int SLOT_GROOVE_V = 18;
-    private static final int SLOT_GROOVE_W = 16;
-    private static final int SLOT_GROOVE_H = 1;
-    /** "By position" sort icon; the other two sort keys use AE2's own sprites. */
-    private static final ResourceLocation SORT_POSITION_ICON =
-            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/cmt_sort_position.png");
+    private static final int SLOT_H = 20;
+
+    /** The "by position" sort icon, drawn centred in the button's 16x16 icon area. */
+    private static final int SORT_ICON_U = 22;
+    private static final int SORT_ICON_V = 3;
+    private static final int SORT_ICON_W = 10;
+    private static final int SORT_ICON_H = 13;
+
+    /** The well's bottom two rows: a grey capacity groove over a black frame line. */
+    private static final int GROOVE_GRAY = 0xFF8E8F96;
+    private static final int GROOVE_BLACK = 0xFF000000;
+    /** The content area's own 1px edge lines, which the wells would otherwise cover. */
+    private static final int CONTENT_EDGE = 0xFFF2F2F2;
 
     /** Width of the panel drawn from the sheet, its two border columns included. */
     private static final int PANEL_WIDTH = 209;
@@ -100,13 +108,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int BOTTOM_H = 11;
 
     /** Title bar: dark edge, highlight, 12 px face, highlight, two dark rows. */
-    private static final int HEADER_V = 90;
-    private static final int HEADER_H = 17;
+    private static final int HEADER_V = 87;
+    private static final int HEADER_H = 16;
 
     /** One content row: light edge columns around the solid face the drives are listed on. */
-    private static final int ROW_V = 107;
+    private static final int ROW_V = 103;
     private static final int ROW_W = PANEL_WIDTH;
-    private static final int ROW_H = 18;
+    private static final int ROW_H = 20;
 
     /** The content area's own closing edge, right below the last content row. */
     private static final int ROW_EDGE_V = 143;
@@ -265,9 +273,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             // The "by position" icon has no AE2 sprite of its own, so it is drawn from our own texture
             // at the same offset and z the base class uses for its icons.
             if (clientSortMode == WcmtMenu.SortMode.POSITION) {
-                Blitter.texture(SORT_POSITION_ICON, 16, 16)
-                        .src(0, 0, 16, 16)
-                        .dest(getX(), getY() + 1 + (isHovered() ? 1 : 0))
+                Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                        .src(SORT_ICON_U, SORT_ICON_V, SORT_ICON_W, SORT_ICON_H)
+                        .dest(getX() + (16 - SORT_ICON_W) / 2, getY() + 3 + (isHovered() ? 1 : 0))
                         .zOffset(3)
                         .blit(guiGraphics);
             }
@@ -582,22 +590,30 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             y += ROW_H;
         }
 
-        // Storage cell wells, only for the slots the current layout actually shows. The well and its
-        // groove are two sub-rects of the same sheet; the well keeps the 16x16 cell area aligned with
-        // the slot's own origin, and the groove sits inside the row so neighbouring wells never touch.
+        // Storage cell wells. An 18x20 well is exactly one row tall, so wells never overlap; the
+        // sheet's bottom two well rows are then overwritten with the capacity groove (grey base,
+        // black frame) that the fill colour is painted into.
         for (AppEngSlot slot : driveSlots) {
             if (!slot.isActive() || slot.x < 0 || slot.y < 0) {
                 continue;
             }
-            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
-                    .src(SLOT_U, SLOT_V, SLOT_W, SLOT_H)
-                    .dest(offsetX + slot.x - 1, offsetY + slot.y - 1)
-                    .blit(guiGraphics);
-            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
-                    .src(SLOT_GROOVE_U, SLOT_GROOVE_V, SLOT_GROOVE_W, SLOT_GROOVE_H)
-                    .dest(offsetX + slot.x, offsetY + slot.y + 16)
-                    .blit(guiGraphics);
+                int sx = offsetX + slot.x;
+                int sy = offsetY + slot.y;
+                Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                        .src(SLOT_U, SLOT_V, SLOT_W, SLOT_H)
+                        .dest(sx - 1, sy - 1)
+                        .blit(guiGraphics);
+                guiGraphics.fill(sx, sy + SLOT_H - 3, sx + SLOT_W - 2, sy + SLOT_H - 2, GROOVE_GRAY);
+                guiGraphics.fill(sx, sy + SLOT_H - 2, sx + SLOT_W - 2, sy + SLOT_H - 1, GROOVE_BLACK);
         }
+
+        // Those wells span the slot columns exactly, so they cover the content area's own left and
+        // right edge lines; draw the two lines back on top.
+        int edgeTop = offsetY + contentTop();
+        int edgeBottom = offsetY + bottomTop();
+        guiGraphics.fill(offsetX + SLOT_X0 - 1, edgeTop, offsetX + SLOT_X0, edgeBottom, CONTENT_EDGE);
+        int edgeRight = SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP + 16;
+        guiGraphics.fill(offsetX + edgeRight, edgeTop, offsetX + edgeRight + 1, edgeBottom, CONTENT_EDGE);
 
         // The content area's own closing edge, then the inventory block (the sheet lays the two out
         // back to back, so they must not be shifted against each other).
@@ -635,7 +651,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                     continue;
                 }
                 if (!slot.getItem().isEmpty()) {
-                    drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 2, info.slots().get(local));
+                    drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 3, info.slots().get(local));
                 }
             }
         }

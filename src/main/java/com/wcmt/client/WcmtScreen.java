@@ -205,12 +205,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     private DriveSnapshotPayload lastApplied;
     private int scrollOffset;
+    /** Last row we asked the server for, so repeated wheel steps don't resend the same request. */
+    private int lastRequestedScroll = -1;
     /**
      * Row offset used while drawing: eases toward {@link #scrollOffset} so a wheel step animates
      * instead of jumping a whole row at once. Slot positions themselves stay on whole rows, so
      * clicks keep landing where they should.
      */
-    private float smoothOffset;
+    private float smoothOffset = -1f;
     /**
      * Mirror of the ordering stored on the terminal itself. Rebuilt from every snapshot, so it also
      * survives closing and reopening the screen.
@@ -362,7 +364,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         // The handle's track is the whole groove, so it can reach both ends without a gap.
         scrollbar.setHeight(INV_H);
         scrollbar.setRange(0, Math.max(0, ClientDriveData.totalRows() - rows), 1);
-        scrollbar.setCurrentScroll(scrollOffset);
+        // Only seed the handle while it is still untouched; afterwards it belongs to the player, and
+        // overwriting it here would undo whatever they just scrolled to.
+        if (lastRequestedScroll < 0) {
+            scrollbar.setCurrentScroll(scrollOffset);
+        }
         scrollbar.setVisible(true);
     }
 
@@ -570,6 +576,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (data != lastApplied) {
             lastApplied = data;
             applyLayout(data);
+            // The snapshot is the only thing that moves the view: the wheel merely asks the server for
+            // a new offset, so the content and the easing offset always describe the same window.
+            // Starting the easing here (from wherever we were) makes the jump animate.
             scrollOffset = data == null ? 0 : data.offset();
             updateScrollbar();
             // The ordering lives on the terminal, not in this screen, so adopt whatever the server
@@ -578,12 +587,17 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             clientSortDescending = ClientDriveData.sortDescending();
         }
 
+        // The wheel/track only picks a new row; the view follows once the server confirms it.
         int scrolled = scrollbar.getCurrentScroll();
-        if (scrolled != scrollOffset) {
-            scrollOffset = scrolled;
+        if (scrolled != lastRequestedScroll) {
+            lastRequestedScroll = scrolled;
             sendLayout(scrolled, rows);
         }
-        // Ease the drawing offset toward the target row so a wheel step slides instead of jumping.
+        if (smoothOffset < 0f) {
+            // First snapshot: start where we are instead of animating in from row 0.
+            smoothOffset = scrollOffset;
+        }
+        // Ease the drawing offset toward the target row so a step slides instead of jumping.
         smoothOffset += (scrollOffset - smoothOffset) * 0.2f;
         if (Math.abs(scrollOffset - smoothOffset) < 0.02f) {
             smoothOffset = scrollOffset;

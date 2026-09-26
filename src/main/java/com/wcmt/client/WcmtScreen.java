@@ -569,9 +569,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (data != lastApplied) {
             lastApplied = data;
             applyLayout(data);
-            // The snapshot is the only thing that moves the view: the wheel merely asks the server for
-            // a new offset, so the content and the easing offset always describe the same window.
-            // Starting the easing here (from wherever we were) makes the jump animate.
+            // The snapshot is the only thing that moves the view: the wheel merely asks the server
+            // for a new offset, so the content and the scroll offset always describe the same window.
             scrollOffset = data == null ? 0 : data.offset();
             updateScrollbar();
             // The ordering lives on the terminal, not in this screen, so adopt whatever the server

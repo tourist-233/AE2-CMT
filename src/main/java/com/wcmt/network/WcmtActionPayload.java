@@ -17,6 +17,8 @@ public record WcmtActionPayload(int action, int a, int b, String text) implement
     public static final int ACTION_SORT = 1;
     public static final int ACTION_SEARCH = 2;
     public static final int ACTION_SORT_DIRECTION = 3;
+    /** Opens the priority screen of the drive selected by {@code a} (its index in the snapshot). */
+    public static final int ACTION_PRIORITY = 4;
 
     public static final Type<WcmtActionPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID, "action"));

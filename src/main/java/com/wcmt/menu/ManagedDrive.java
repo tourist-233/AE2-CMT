@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -42,6 +43,14 @@ public interface ManagedDrive {
     void setCell(int slot, ItemStack stack);
 
     DriveSnapshotPayload.SlotStat stat(int slot);
+
+    /**
+     * Opens this host's own priority screen, when it has one. Addons whose priority lives on another
+     * block (NeoECO keeps it on the storage-system host) either do that themselves or decline.
+     */
+    default boolean openPriority(ServerPlayer player) {
+        return false;
+    }
 
     /** Used/total byte ratio of the whole drive, for sorting by usage. */
     double fillRatio();

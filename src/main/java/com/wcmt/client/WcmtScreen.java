@@ -78,6 +78,16 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int SORT_ICON_W = 10;
     private static final int SORT_ICON_H = 13;
 
+    /**
+     * The priority button at the right end of a drive's name row: its three states sit side by side
+     * in the sheet (idle, hovered, pressed).
+     */
+    private static final int PRIORITY_ICON_V = 0;
+    private static final int PRIORITY_ICON_SIZE = 18;
+    private static final int PRIORITY_ICON_U_IDLE = 36;
+    private static final int PRIORITY_ICON_U_HOVER = 54;
+    private static final int PRIORITY_ICON_U_DOWN = 72;
+
     /** The well's bottom two rows: a grey capacity groove over a black frame line. */
     private static final int GROOVE_GRAY = 0xFF8E8F96;
     private static final int GROOVE_BLACK = 0xFF000000;
@@ -133,6 +143,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int LABEL_SCROLL_GAP = 24;
     /** Pixels the label advances per client tick while scrolling. */
     private static final float LABEL_SCROLL_SPEED = 0.5f;
+    /** Ticks to hold a drive label still after a full pass before scrolling it again. */
+    private static final int LABEL_SCROLL_PAUSE_TICKS = 30;
 
     /**
      * Player slots inside the inventory block. The wells start at sheet x=8 and are 18 px apart; the
@@ -213,6 +225,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private int scrollOffset;
     /** Last row we asked the server for, so repeated wheel steps don't resend the same request. */
     private int lastRequestedScroll = -1;
+    /** Visible drive whose priority button is currently held down, or -1. */
+    private int pressedPriority = -1;
     /**
      * Mirror of the ordering stored on the terminal itself. Rebuilt from every snapshot, so it also
      * survives closing and reopening the screen.
@@ -672,9 +686,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             // A drive scrolled halfway out of the window has a negative or too small row index;
             // its name row must not be drawn outside the panel.
             if (headerRow >= 0 && headerRow < rows && k < driveHeaders.length) {
-                // The icon stays put; only the label scrolls, and only when it does not fit.
+                // The icon never moves; only the label scrolls, and only when it does not fit.
                 guiGraphics.renderItem(info.icon(), SLOT_X0, headerY + 1);
                 drawDriveLabel(guiGraphics, driveHeaders[k], offsetX, offsetY, headerY);
+                drawPriorityButton(guiGraphics, k, mouseX, mouseY);
             }
 
             for (int local = 0; local < driveCells[k] && local < info.slots().size(); local++) {
@@ -697,13 +712,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     }
 
     /**
-     * Draws a drive's name (and its capacity readout) beside its icon. A label that is too wide for
-     * the row scrolls left in a loop instead of spilling out of the content area; short ones are
-     * drawn as-is.
+     * Draws a drive's name (and its capacity readout) beside its icon. A label too wide for the row
+     * scrolls left in a loop — one full pass, then a short pause — up to the priority button; short
+     * labels are drawn as-is.
      */
     private void drawDriveLabel(GuiGraphics guiGraphics, Component label, int offsetX, int offsetY, int rowY) {
         int left = SLOT_X0 + 18;
-        int right = SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP + 16;
+        int right = priorityButtonX();
         int textY = rowY + 5;
         int width = font.width(label);
         if (width <= right - left) {
@@ -711,12 +726,87 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             return;
         }
         guiGraphics.enableScissor(offsetX + left, offsetY + rowY, offsetX + right, offsetY + rowY + ROW_H);
-        int cycle = width + LABEL_SCROLL_GAP;
-        int shift = (int) (Minecraft.getInstance().gui.getGuiTicks() * LABEL_SCROLL_SPEED) % cycle;
+        int span = width + LABEL_SCROLL_GAP;
+        // One pass of scrolling, then a pause, repeating forever.
+        int runTicks = Math.round(span / LABEL_SCROLL_SPEED);
+        int tick = Minecraft.getInstance().gui.getGuiTicks() % (runTicks + LABEL_SCROLL_PAUSE_TICKS);
+        int shift = tick < runTicks ? (int) (tick * LABEL_SCROLL_SPEED) : 0;
         FormattedCharSequence text = label.getVisualOrderText();
         guiGraphics.drawString(font, text, left - shift, textY, LABEL_COLOR, false);
-        guiGraphics.drawString(font, text, left - shift + cycle, textY, LABEL_COLOR, false);
+        guiGraphics.drawString(font, text, left - shift + span, textY, LABEL_COLOR, false);
         guiGraphics.disableScissor();
+    }
+
+    /** Left edge (GUI coords) of a row's priority button, just above the last content slot. */
+    private int priorityButtonX() {
+        return SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP - 1;
+    }
+
+    /** Top edge (GUI coords) of visible drive {@code k}'s name row, or -1 when it is off-screen. */
+    private int priorityButtonY(int k) {
+        int headerRow = k < driveRowStart.length ? driveRowStart[k] : -1;
+        if (headerRow < 0 || headerRow >= rows) {
+            return -1;
+        }
+        return contentTop() + headerRow * ROW_H;
+    }
+
+    /** The per-drive button that opens that drive's own priority screen; its icon shows the state. */
+    private void drawPriorityButton(GuiGraphics guiGraphics, int drive, int mouseX, int mouseY) {
+        int by = priorityButtonY(drive);
+        if (by < 0) {
+            return;
+        }
+        int bx = priorityButtonX();
+        int u = PRIORITY_ICON_U_IDLE;
+        if (pressedPriority == drive) {
+            u = PRIORITY_ICON_U_DOWN;
+        } else if (isHovering(bx, by, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE, mouseX, mouseY)) {
+            u = PRIORITY_ICON_U_HOVER;
+        }
+        // drawFG works in screen-relative coordinates, like the icon and label beside it.
+        Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                .src(u, PRIORITY_ICON_V, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE)
+                .dest(bx, by)
+                .blit(guiGraphics);
+    }
+
+    /** The priority buttons are drawn rather than widgets (there is one per visible drive). */
+    private int priorityButtonAt(double mouseX, double mouseY) {
+        for (int k = 0; k < ClientDriveData.drives().size(); k++) {
+            int by = priorityButtonY(k);
+            if (by >= 0 && isHovering(priorityButtonX(), by, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE,
+                    mouseX, mouseY)) {
+                return k;
+            }
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            int hit = priorityButtonAt(mouseX, mouseY);
+            if (hit >= 0) {
+                pressedPriority = hit;
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0 && pressedPriority >= 0) {
+            int hit = pressedPriority;
+            pressedPriority = -1;
+            if (priorityButtonAt(mouseX, mouseY) == hit) {
+                PacketDistributor.sendToServer(new WcmtActionPayload(
+                        WcmtActionPayload.ACTION_PRIORITY, hit, 0, ""));
+                return true;
+            }
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     /** Copies the network-wide totals the server computed; the two grooves beside the inventory use them. */

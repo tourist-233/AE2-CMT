@@ -2,10 +2,14 @@ package com.wcmt.menu;
 
 import appeng.blockentity.storage.DriveBlockEntity;
 import appeng.me.cells.BasicCellInventory;
+import appeng.menu.MenuOpener;
+import appeng.menu.implementations.PriorityMenu;
+import appeng.menu.locator.MenuLocators;
 import com.wcmt.network.DriveSnapshotPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.item.ItemStack;
 
@@ -34,6 +38,12 @@ final class Ae2Drive implements ManagedDrive {
     @Override
     public boolean online() {
         return drive.isPowered();
+    }
+
+    @Override
+    public boolean openPriority(ServerPlayer player) {
+        // AE2's drives are priority hosts themselves, so their own screen can be opened directly.
+        return MenuOpener.open(PriorityMenu.TYPE, player, MenuLocators.forBlockEntity(drive));
     }
 
     @Override

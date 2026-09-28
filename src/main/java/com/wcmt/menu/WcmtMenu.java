@@ -272,6 +272,13 @@ public class WcmtMenu extends AEBaseMenu {
                 sortConfig.putSetting(Settings.SORT_DIRECTION,
                         a != 0 ? SortDir.DESCENDING : SortDir.ASCENDING);
             case WcmtActionPayload.ACTION_SEARCH -> search = text == null ? "" : text;
+            case WcmtActionPayload.ACTION_PRIORITY -> {
+                // Opens the drive's own screen, which replaces this terminal's menu anyway; the slot
+                // index is the one the client saw in the snapshot, i.e. inside the visible window.
+                if (a >= 0 && a < visibleDrives.size() && getPlayer() instanceof ServerPlayer player) {
+                    visibleDrives.get(a).openPriority(player);
+                }
+            }
             default -> {
                 return;
             }

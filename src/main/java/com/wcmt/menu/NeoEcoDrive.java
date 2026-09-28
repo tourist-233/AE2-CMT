@@ -16,6 +16,7 @@ import com.wcmt.network.DriveSnapshotPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -56,6 +57,11 @@ final class NeoEcoDrive implements ManagedDrive {
     private static final Method getCluster;
     /** {@code ECODriveBlockEntity#isLockedByInfiniteMode()}: null when that API is missing. */
     private static final Method isLockedByInfiniteMode;
+    /**
+     * LDLib2's entry point for a block's own screen ({@code BlockUIMenuType.openUI}). NeoECO brings
+     * LDLib2 with it, but the terminal does not depend on it, so this is looked up reflectively.
+     */
+    private static final Method openBlockUi;
 
     static {
         Class<?> driveClass = null;
@@ -111,6 +117,7 @@ final class NeoEcoDrive implements ManagedDrive {
         }
         Method infiniteMode = driveClass == null ? null : findMethod(driveClass, "isLockedByInfiniteMode");
         storageDriveClass = driveClass;
+        openBlockUi = findOpenBlockUi();
         getCellStack = readCell;
         setCellStack = writeCell;
         isItemValid = valid;
@@ -186,8 +193,37 @@ final class NeoEcoDrive implements ManagedDrive {
         return parts;
     }
 
-    private static Method findMethod(Class<?> start, String name) {
-        for (Class<?> type = start; type != null; type = type.getSuperclass()) {
+    /** Resolves LDLib2's block-UI opener, or null when NeoECO (and LDLib2) is not installed. */
+    private static Method findOpenBlockUi() {
+        try {
+            return Class.forName("com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType")
+                    .getMethod("openUI", ServerPlayer.class, BlockPos.class);
+        } catch (ReflectiveOperationException | LinkageError e) {
+            return null;
+        }
+    }
+
+    /**
+     * The priority of a NeoECO storage system belongs to the multiblock's host, so the host's screen
+     * (which contains the priority control) is opened rather than any drive block's.
+     */
+    @Override
+    public boolean openPriority(ServerPlayer player) {
+        if (controller == null || openBlockUi == null) {
+            return false;
+        }
+        try {
+            openBlockUi.invoke(null, player, controller.getBlockPos());
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            if (REPORTED_FAILURES.add("openUI")) {
+                WcmtMod.LOGGER.warn("Could not open the NeoECO storage host screen", e);
+            }
+            return false;
+        }
+    }
+
+    private static Method findMethod(Class<?> start, String name) {        for (Class<?> type = start; type != null; type = type.getSuperclass()) {
             try {
                 Method method = type.getDeclaredMethod(name);
                 method.setAccessible(true);

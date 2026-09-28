@@ -25,6 +25,7 @@ import com.wcmt.network.WcmtActionPayload;
 import de.mari_023.ae2wtlib.api.gui.ScrollingUpgradesPanel;
 import de.mari_023.ae2wtlib.api.terminal.IUniversalTerminalCapable;
 import de.mari_023.ae2wtlib.api.terminal.WTMenuHost;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -127,6 +128,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int SLOT_X0 = 8;
     private static final int SLOT_STEP = 18;
     private static final int SLOTS_PER_ROW = WcmtMenu.SLOTS_PER_ROW;
+
+    /** Gap between a scrolling drive label and its next copy, so the wrap is readable. */
+    private static final int LABEL_SCROLL_GAP = 24;
+    /** Pixels the label advances per client tick while scrolling. */
+    private static final float LABEL_SCROLL_SPEED = 0.5f;
 
     /**
      * Player slots inside the inventory block. The wells start at sheet x=8 and are 18 px apart; the
@@ -666,9 +672,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             // A drive scrolled halfway out of the window has a negative or too small row index;
             // its name row must not be drawn outside the panel.
             if (headerRow >= 0 && headerRow < rows && k < driveHeaders.length) {
+                // The icon stays put; only the label scrolls, and only when it does not fit.
                 guiGraphics.renderItem(info.icon(), SLOT_X0, headerY + 1);
-                guiGraphics.drawString(font, driveHeaders[k].getVisualOrderText(), SLOT_X0 + 18, headerY + 5,
-                        LABEL_COLOR, false);
+                drawDriveLabel(guiGraphics, driveHeaders[k], offsetX, offsetY, headerY);
             }
 
             for (int local = 0; local < driveCells[k] && local < info.slots().size(); local++) {
@@ -688,6 +694,29 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
         drawProgressBars(guiGraphics);
         drawLinkStatus(guiGraphics);
+    }
+
+    /**
+     * Draws a drive's name (and its capacity readout) beside its icon. A label that is too wide for
+     * the row scrolls left in a loop instead of spilling out of the content area; short ones are
+     * drawn as-is.
+     */
+    private void drawDriveLabel(GuiGraphics guiGraphics, Component label, int offsetX, int offsetY, int rowY) {
+        int left = SLOT_X0 + 18;
+        int right = SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP + 16;
+        int textY = rowY + 5;
+        int width = font.width(label);
+        if (width <= right - left) {
+            guiGraphics.drawString(font, label.getVisualOrderText(), left, textY, LABEL_COLOR, false);
+            return;
+        }
+        guiGraphics.enableScissor(offsetX + left, offsetY + rowY, offsetX + right, offsetY + rowY + ROW_H);
+        int cycle = width + LABEL_SCROLL_GAP;
+        int shift = (int) (Minecraft.getInstance().gui.getGuiTicks() * LABEL_SCROLL_SPEED) % cycle;
+        FormattedCharSequence text = label.getVisualOrderText();
+        guiGraphics.drawString(font, text, left - shift, textY, LABEL_COLOR, false);
+        guiGraphics.drawString(font, text, left - shift + cycle, textY, LABEL_COLOR, false);
+        guiGraphics.disableScissor();
     }
 
     /** Copies the network-wide totals the server computed; the two grooves beside the inventory use them. */

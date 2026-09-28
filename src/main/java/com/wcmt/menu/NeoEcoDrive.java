@@ -19,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * {@link ManagedDrive} view of one NeoECO LD storage matrix (the "ECO - LD 存储矩阵驱动器" block).
@@ -126,9 +127,16 @@ final class NeoEcoDrive implements ManagedDrive {
 
     /** Drive blocks of one cluster, ordered by position so a cell keeps its slot while scrolling. */
     private final List<BlockEntity> parts;
+    /**
+     * The cluster's storage-system host ("可拓展存储系统主机"), or null while the multiblock is not
+     * formed. The host is what determines the tier (L4/L6/L9), so the entry is shown as the host.
+     */
+    @Nullable
+    private final BlockEntity controller;
 
-    private NeoEcoDrive(List<BlockEntity> parts) {
+    private NeoEcoDrive(List<BlockEntity> parts, @Nullable BlockEntity controller) {
         this.parts = parts;
+        this.controller = controller;
     }
 
     /** One managed drive per cluster; owners that are not LD storage matrix blocks are ignored. */
@@ -145,7 +153,7 @@ final class NeoEcoDrive implements ManagedDrive {
             Object cluster = getCluster == null ? null : invoke(getCluster, owner);
             if (cluster == null) {
                 // Not part of a formed cluster (yet): show it on its own.
-                result.add(new NeoEcoDrive(List.of(owner)));
+                result.add(new NeoEcoDrive(List.of(owner), null));
                 continue;
             }
             if (seenClusters.contains(cluster)) {
@@ -153,7 +161,7 @@ final class NeoEcoDrive implements ManagedDrive {
             }
             seenClusters.add(cluster);
             List<BlockEntity> parts = drivesOf(cluster);
-            result.add(new NeoEcoDrive(parts.isEmpty() ? List.of(owner) : parts));
+            result.add(new NeoEcoDrive(parts.isEmpty() ? List.of(owner) : parts, controllerOf(cluster)));
         }
         return result;
     }
@@ -215,18 +223,35 @@ final class NeoEcoDrive implements ManagedDrive {
         return slot >= 0 && slot < parts.size() ? parts.get(slot) : null;
     }
 
+    /** The cluster's storage-system host block entity, or null when it has none. */
+    private static BlockEntity controllerOf(Object cluster) {
+        Method getController = findMethod(cluster.getClass(), "getController");
+        return getController != null && invoke(getController, cluster) instanceof BlockEntity host
+                && !host.isRemoved()
+                ? host
+                : null;
+    }
+
+    /**
+     * The block this entry is labelled and iconed with: the host when the cluster is formed (its block
+     * carries the tier, e.g. "ECO - L4 可拓展存储系统主机"), otherwise the first drive block.
+     */
+    private BlockEntity displayEntity() {
+        return controller != null ? controller : parts.get(0);
+    }
+
     @Override
     public Component name() {
-        BlockEntity first = parts.get(0);
-        if (first instanceof Nameable nameable && nameable.hasCustomName()) {
+        BlockEntity shown = displayEntity();
+        if (shown instanceof Nameable nameable && nameable.hasCustomName()) {
             return nameable.getCustomName();
         }
-        return first.getBlockState().getBlock().getName();
+        return shown.getBlockState().getBlock().getName();
     }
 
     @Override
     public ItemStack icon() {
-        return parts.get(0).getBlockState().getBlock().asItem().getDefaultInstance();
+        return displayEntity().getBlockState().getBlock().asItem().getDefaultInstance();
     }
 
     @Override

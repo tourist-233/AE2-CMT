@@ -249,6 +249,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** Visible drive whose priority button is currently held down, or -1. */
     private int pressedPriority = -1;
     /**
+     * Scroll offset to restore the next time this screen is created. Opening a drive's priority
+     * screen replaces the terminal menu, and the server reopens it on the way back; without this the
+     * fresh screen would start at the first drive instead of where the player left off.
+     */
+    private static int pendingScrollOffset = -1;
+    /**
      * Mirror of the ordering stored on the terminal itself. Rebuilt from every snapshot, so it also
      * survives closing and reopening the screen.
      */
@@ -379,6 +385,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         super.init();
         collectDriveSlots();
         applyLayout(ClientDriveData.get());
+        if (pendingScrollOffset >= 0) {
+            scrollOffset = pendingScrollOffset;
+            pendingScrollOffset = -1;
+        }
         lastApplied = ClientDriveData.get();
         positionPlayerInventory();
         // Hang the upgrade panel off the sheet's right edge, mirroring the terminal-height button
@@ -668,6 +678,11 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             // lines meet the cell wells above and below it (the wells sit at slot.y - 1 too).
             blit(guiGraphics, offsetX, nameRow ? y - 1 : y, 0, nameRow ? NAME_ROW_V : ROW_V, ROW_W,
                     nameRow ? NAME_ROW_H : ROW_H);
+            if (nameRow) {
+                // Shifting the slice up leaves its last line uncovered outside the cell wells, which
+                // would show through as a black line down both edges; lay row backing under it.
+                blit(guiGraphics, offsetX, y + ROW_H - 1, 0, ROW_V, ROW_W, 1);
+            }
             y += ROW_H;
         }
 
@@ -851,6 +866,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             int hit = pressedPriority;
             pressedPriority = -1;
             if (priorityButtonAt(mouseX, mouseY) == hit) {
+                pendingScrollOffset = scrollOffset;
                 PacketDistributor.sendToServer(new WcmtActionPayload(
                         WcmtActionPayload.ACTION_PRIORITY, hit, 0, ""));
                 return true;

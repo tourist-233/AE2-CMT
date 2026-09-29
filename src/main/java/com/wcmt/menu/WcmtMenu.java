@@ -30,6 +30,7 @@ import de.mari_023.ae2wtlib.api.gui.AE2wtlibSlotSemantics;
 import de.mari_023.ae2wtlib.api.terminal.ItemWUT;
 import de.mari_023.ae2wtlib.api.terminal.WTMenuHost;
 import com.wcmt.part.WcmtTerminalPart;
+import com.wcmt.util.PriorityReturn;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.server.level.ServerPlayer;
@@ -276,6 +277,11 @@ public class WcmtMenu extends AEBaseMenu {
                 // Opens the drive's own screen, which replaces this terminal's menu anyway; the slot
                 // index is the one the client saw in the snapshot, i.e. inside the visible window.
                 if (a >= 0 && a < visibleDrives.size() && getPlayer() instanceof ServerPlayer player) {
+                    // AE2's screen would send the player back to the drive block, not here, so the way
+                    // back is remembered before opening it.
+                    PriorityReturn.remember(player,
+                            part == null ? ModMenus.WCMT_MENU_TYPE : ModMenus.WCMT_PART_MENU_TYPE,
+                            getLocator());
                     visibleDrives.get(a).openPriority(player);
                 }
             }

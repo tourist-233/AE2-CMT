@@ -16,6 +16,7 @@ import appeng.items.tools.powered.WirelessTerminalItem;
 import com.wcmt.menu.WcmtMenu;
 import com.wcmt.menu.WcmtMenuHost;
 import com.wcmt.part.WcmtTerminalPart;
+import com.wcmt.util.PriorityReturn;
 import de.mari_023.ae2wtlib.api.gui.Icon;
 import de.mari_023.ae2wtlib.api.registration.AddTerminalEvent;
 import net.minecraft.world.item.ItemStack;
@@ -33,6 +34,8 @@ public class WcmtMod {
 
     public WcmtMod(IEventBus modEventBus) {
         ModItems.register(modEventBus);
+        // Watches for players coming back from a drive's priority screen.
+        PriorityReturn.init();
         // Touch ModMenus so its menu type is queued into AE2's registry before the registry event fires.
         ModMenus.init();
         // AE2 freezes its part-model table early; the cable terminal's models must be in it by then.

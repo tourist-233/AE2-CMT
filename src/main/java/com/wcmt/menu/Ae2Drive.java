@@ -94,14 +94,17 @@ final class Ae2Drive implements ManagedDrive {
         long used = 0;
         long total = 0;
         long typeCapacity = 0;
+        long typeUsed = 0;
         if (cell instanceof BasicCellInventory basic) {
             used = basic.getUsedBytes();
             total = basic.getTotalBytes();
             typeCapacity = basic.getTotalItemTypes();
+            typeUsed = basic.getStoredItemTypes();
         }
         return new DriveSnapshotPayload.SlotStat(used, total,
                 ManagedDrive.isInfinite(total) || ManagedDrive.isInfiniteItem(cell(slot)),
-                ManagedDrive.isInfinite(total), typeCapacity, (byte) drive.getCellStatus(slot).ordinal());
+                ManagedDrive.isInfinite(total), typeCapacity, typeUsed,
+                (byte) drive.getCellStatus(slot).ordinal());
     }
 
     @Override

@@ -41,11 +41,11 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
      * distinct types this cell can hold (0 when it doesn't report one).
      */
     public record SlotStat(long used, long total, boolean infinite, boolean capacityInfinite,
-            long typeCapacity, byte state) {
+            long typeCapacity, long typeUsed, byte state) {
 
         /** No cell in this slot. */
         public static SlotStat absent() {
-            return new SlotStat(0, 0, false, false, 0, (byte) CellState.ABSENT.ordinal());
+            return new SlotStat(0, 0, false, false, 0, 0, (byte) CellState.ABSENT.ordinal());
         }
     }
 
@@ -137,12 +137,13 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         buf.writeBoolean(s.infinite());
         buf.writeBoolean(s.capacityInfinite());
         buf.writeVarLong(s.typeCapacity());
+        buf.writeVarLong(s.typeUsed());
         buf.writeByte(s.state());
     }
 
     private static SlotStat decodeStat(RegistryFriendlyByteBuf buf) {
         return new SlotStat(buf.readVarLong(), buf.readVarLong(), buf.readBoolean(), buf.readBoolean(),
-                buf.readVarLong(), buf.readByte());
+                buf.readVarLong(), buf.readVarLong(), buf.readByte());
     }
 
     public static void handle(DriveSnapshotPayload payload, IPayloadContext context) {

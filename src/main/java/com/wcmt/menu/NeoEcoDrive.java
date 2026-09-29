@@ -52,6 +52,8 @@ final class NeoEcoDrive implements ManagedDrive {
     private static final Method getTotalBytes;
     /** How many distinct types a cell can hold; not every NeoECO version reports it. */
     private static final Method getTotalItemTypes;
+    /** How many distinct types a cell currently holds. */
+    private static final Method getStoredItemTypes;
     private static final Method getStatus;
     private static final Method getMainNode;
     private static final Method getCluster;
@@ -110,10 +112,14 @@ final class NeoEcoDrive implements ManagedDrive {
             node = null;
         }
         Method types = null;
+        Method usedTypes = null;
         try {
-            types = findMethod(Class.forName(CELL_INTERFACE), "getTotalItemTypes");
+            Class<?> cellInterface = Class.forName(CELL_INTERFACE);
+            types = findMethod(cellInterface, "getTotalItemTypes");
+            usedTypes = findMethod(cellInterface, "getStoredItemTypes");
         } catch (ReflectiveOperationException | LinkageError e) {
             types = null;
+            usedTypes = null;
         }
         Method infiniteMode = driveClass == null ? null : findMethod(driveClass, "isLockedByInfiniteMode");
         storageDriveClass = driveClass;
@@ -130,6 +136,7 @@ final class NeoEcoDrive implements ManagedDrive {
         getCluster = cluster;
         isLockedByInfiniteMode = infiniteMode;
         getTotalItemTypes = types;
+        getStoredItemTypes = usedTypes;
     }
 
     /** Drive blocks of one cluster, ordered by position so a cell keeps its slot while scrolling. */
@@ -371,10 +378,17 @@ final class NeoEcoDrive implements ManagedDrive {
                     ? (byte) cellState.ordinal()
                     : (byte) CellState.ABSENT.ordinal();
             long typeCapacity = 0;
+            long typeUsed = 0;
             if (getTotalItemTypes != null) {
                 Object reported = invoke(getTotalItemTypes, inventory);
                 if (reported instanceof Number number) {
                     typeCapacity = number.longValue();
+                }
+            }
+            if (getStoredItemTypes != null) {
+                Object reported = invoke(getStoredItemTypes, inventory);
+                if (reported instanceof Number number) {
+                    typeUsed = number.longValue();
                 }
             }
             // Unlimited storage in NeoECO means the cluster runs in infinite mode; a cell that only
@@ -383,7 +397,7 @@ final class NeoEcoDrive implements ManagedDrive {
             boolean clusterInfinite = inInfiniteMode(part(slot));
             boolean infinite = clusterInfinite || ManagedDrive.isInfiniteItem(cell(slot));
             return new DriveSnapshotPayload.SlotStat(used, total, infinite, clusterInfinite, typeCapacity,
-                    state);
+                    typeUsed, state);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
             return DriveSnapshotPayload.SlotStat.absent();
         }

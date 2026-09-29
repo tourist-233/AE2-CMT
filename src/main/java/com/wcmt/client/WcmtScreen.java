@@ -179,6 +179,17 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int BAR_U_HALF = 111;
     private static final int BAR_U_LOW = 120;
 
+    /**
+     * The tiny type/byte usage badges drawn in a slot's top-right corner. Each is a 3x3 square in the
+     * sheet: two columns (x104/x108) by three rows (y0/y4/y8), a black frame around a coloured dot.
+     */
+    private static final int BADGE_SIZE = 3;
+    private static final int BADGE_U_LEFT = 104;
+    private static final int BADGE_U_RIGHT = 108;
+    private static final int BADGE_V_TOP = 0;
+    private static final int BADGE_V_MID = 4;
+    private static final int BADGE_V_BOTTOM = 8;
+
     /** AE2's scrollbar handle runs down the sheet's right-hand groove (x 194..201). */
     private static final int SCROLLBAR_X = 191;
 
@@ -198,6 +209,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int STORAGE_COLOR_LOW = 0x46FA3D;
     private static final int STORAGE_COLOR_MEDIUM = 0xFA7C3D;
     private static final int STORAGE_COLOR_HIGH = 0xFF2427;
+    /** Colour of the fifth swatch: cells that supply unlimited *resources* rather than capacity. */
+    private static final int STORAGE_COLOR_UNLIMITED_RESOURCE = 0xE1369C;
 
     /** Unlimited capacity (a cell that reports infinite bytes, or NeoECO's infinite mode). */
     private static final int INFINITE_COLOR = 0xFFD73DFA;
@@ -703,6 +716,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 }
                 if (!slot.getItem().isEmpty()) {
                     drawCapacityBar(guiGraphics, slot.x, slot.y + ROW_H - 4, info.slots().get(local));
+                    drawCellBadge(guiGraphics, slot.x, slot.y, info.slots().get(local));
                 }
             }
         }
@@ -973,7 +987,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private void drawCapacityBar(GuiGraphics guiGraphics, int x, int y, DriveSnapshotPayload.SlotStat stat) {
         int width = SLOT_STEP - 2;
         if (stat.infinite()) {
-            guiGraphics.fill(x, y, x + width, y + 1, INFINITE_COLOR);
+            // Unlimited capacity: a full bar in its own colour; unlimited *resources* keep theirs.
+            guiGraphics.fill(x, y, x + width, y + 1,
+                    (stat.capacityInfinite() ? INFINITE_COLOR : STORAGE_COLOR_UNLIMITED_RESOURCE) | 0xFF000000);
             return;
         }
         int filled = stat.total() > 0
@@ -983,6 +999,44 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (filled > 0) {
             guiGraphics.fill(x, y, x + filled, y + 1, storageColor(stat.used(), stat.total()) | 0xFF000000);
         }
+    }
+
+    /**
+     * Type/byte usage badge in a slot's top-right corner. Which of the sheet's six badges is drawn
+     * depends on how full the cell's type budget and byte budget are; cells with unlimited capacity
+     * or unlimited resources get their own two.
+     */
+    private void drawCellBadge(GuiGraphics guiGraphics, int slotX, int slotY, DriveSnapshotPayload.SlotStat stat) {
+        int u;
+        int v;
+        if (stat.capacityInfinite()) {
+            u = BADGE_U_LEFT;
+            v = BADGE_V_BOTTOM;
+        } else if (stat.infinite()) {
+            u = BADGE_U_RIGHT;
+            v = BADGE_V_BOTTOM;
+        } else {
+            boolean typesFull = stat.typeCapacity() > 0 && stat.typeUsed() >= stat.typeCapacity();
+            boolean bytesFull = stat.total() > 0 && stat.used() >= stat.total();
+            if (typesFull && bytesFull) {
+                u = BADGE_U_RIGHT;
+                v = BADGE_V_MID;
+            } else if (typesFull) {
+                u = BADGE_U_LEFT;
+                v = BADGE_V_MID;
+            } else if (stat.typeUsed() > 0 || stat.used() > 0) {
+                u = BADGE_U_RIGHT;
+                v = BADGE_V_TOP;
+            } else {
+                u = BADGE_U_LEFT;
+                v = BADGE_V_TOP;
+            }
+        }
+        Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                .src(u, v, BADGE_SIZE, BADGE_SIZE)
+                .dest(slotX + 16 - BADGE_SIZE, slotY)
+                .zOffset(3)
+                .blit(guiGraphics);
     }
 
     private static String formatBytes(long value) {

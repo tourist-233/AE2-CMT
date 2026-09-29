@@ -753,7 +753,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     /** Left edge (GUI coords) of a row's priority button, just above the last content slot. */
     private int priorityButtonX() {
-        return SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP - 1;
+        return SLOT_X0 + (SLOTS_PER_ROW - 1) * SLOT_STEP - 2;
     }
 
     /** Top edge (GUI coords) of visible drive {@code k}'s name row, or -1 when it is off-screen. */
@@ -765,9 +765,15 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         return contentTop() + headerRow * ROW_H;
     }
 
+    /** Top edge (GUI coords) of visible drive {@code k}'s priority button, or -1 when off-screen. */
+    private int priorityButtonTop(int k) {
+        int rowY = priorityButtonY(k);
+        return rowY < 0 ? -1 : rowY + 1;
+    }
+
     /** The per-drive button that opens that drive's own priority screen; its icon shows the state. */
     private void drawPriorityButton(GuiGraphics guiGraphics, int drive, int mouseX, int mouseY) {
-        int by = priorityButtonY(drive);
+        int by = priorityButtonTop(drive);
         if (by < 0) {
             return;
         }
@@ -788,7 +794,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** The priority buttons are drawn rather than widgets (there is one per visible drive). */
     private int priorityButtonAt(double mouseX, double mouseY) {
         for (int k = 0; k < ClientDriveData.drives().size(); k++) {
-            int by = priorityButtonY(k);
+            int by = priorityButtonTop(k);
             if (by >= 0 && isHovering(priorityButtonX(), by, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE,
                     mouseX, mouseY)) {
                 return k;

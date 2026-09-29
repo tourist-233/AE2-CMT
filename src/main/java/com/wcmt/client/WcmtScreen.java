@@ -664,7 +664,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         int y = offsetY + contentTop();
         for (int row = 0; row < rows; row++) {
             boolean nameRow = row < nameRows.length && nameRows[row];
-            blit(guiGraphics, offsetX, y, 0, nameRow ? NAME_ROW_V : ROW_V, ROW_W,
+            // The name-row slice carries a shading line top and bottom; shift it up one pixel so those
+            // lines meet the cell wells above and below it (the wells sit at slot.y - 1 too).
+            blit(guiGraphics, offsetX, nameRow ? y - 1 : y, 0, nameRow ? NAME_ROW_V : ROW_V, ROW_W,
                     nameRow ? NAME_ROW_H : ROW_H);
             y += ROW_H;
         }
@@ -720,9 +722,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             if (headerRow >= 0 && headerRow < rows && k < driveHeaders.length) {
                 // The icon never moves; only the label scrolls, and only when it does not fit.
                 guiGraphics.pose().pushPose();
-                // Draw the drive icon a little smaller, and centred in the slot-sized cell the icon
-                // would normally occupy.
-                guiGraphics.pose().translate(SLOT_X0, headerY + 1, 0f);
+                // A smaller drive icon, centred in the 16x16 cell it would otherwise fill. The icon's
+                // own isometric shape leans right, so the inset is a touch under half the slack.
+                float iconInset = (16 - 16 * NAME_ICON_SCALE) / 2f - 0.5f;
+                guiGraphics.pose().translate(SLOT_X0 + iconInset, headerY + 1 + iconInset + 0.5f, 0f);
                 guiGraphics.pose().scale(NAME_ICON_SCALE, NAME_ICON_SCALE, 1f);
                 guiGraphics.renderItem(info.icon(), 0, 0);
                 guiGraphics.pose().popPose();

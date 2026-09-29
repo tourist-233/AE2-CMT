@@ -126,6 +126,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int ROW_V = 103;
     private static final int ROW_W = PANEL_WIDTH;
     private static final int ROW_H = 20;
+    /**
+     * Drive name rows use a slice of their own, so their height can be tuned separately from the cell
+     * rows; it carries a shading line top and bottom.
+     */
+    private static final int NAME_ROW_V = 66;
+    private static final int NAME_ROW_H = 20;
+    /** Fraction of full size a drive's icon is drawn at in its name row. */
+    private static final float NAME_ICON_SCALE = 0.75f;
 
     /** The content area's own closing edge, right below the last content row. */
     private static final int ROW_EDGE_V = 143;
@@ -510,6 +518,15 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             cellCursor += cells;
         }
 
+        // Name rows are drawn with their own slice; everything below them is a cell row.
+        nameRows = new boolean[Math.max(0, rowCursor)];
+        for (int k = 0; k < count; k++) {
+            int start = driveRowStart[k];
+            if (start >= 0 && start < nameRows.length) {
+                nameRows[start] = true;
+            }
+        }
+
         for (int i = 0; i < driveSlots.size(); i++) {
             AppEngSlot slot = driveSlots.get(i);
             int rowIndex = rowIndexForSlot(i, count);
@@ -646,7 +663,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
         int y = offsetY + contentTop();
         for (int row = 0; row < rows; row++) {
-            blit(guiGraphics, offsetX, y, 0, ROW_V, ROW_W, ROW_H);
+            boolean nameRow = row < nameRows.length && nameRows[row];
+            blit(guiGraphics, offsetX, y, 0, nameRow ? NAME_ROW_V : ROW_V, ROW_W,
+                    nameRow ? NAME_ROW_H : ROW_H);
             y += ROW_H;
         }
 
@@ -700,7 +719,13 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             // its name row must not be drawn outside the panel.
             if (headerRow >= 0 && headerRow < rows && k < driveHeaders.length) {
                 // The icon never moves; only the label scrolls, and only when it does not fit.
-                guiGraphics.renderItem(info.icon(), SLOT_X0, headerY + 1);
+                guiGraphics.pose().pushPose();
+                // Draw the drive icon a little smaller, and centred in the slot-sized cell the icon
+                // would normally occupy.
+                guiGraphics.pose().translate(SLOT_X0, headerY + 1, 0f);
+                guiGraphics.pose().scale(NAME_ICON_SCALE, NAME_ICON_SCALE, 1f);
+                guiGraphics.renderItem(info.icon(), 0, 0);
+                guiGraphics.pose().popPose();
                 drawDriveLabel(guiGraphics, driveHeaders[k], offsetX, offsetY, headerY);
                 drawPriorityButton(guiGraphics, k, mouseX, mouseY);
             }
@@ -765,10 +790,12 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         return contentTop() + headerRow * ROW_H;
     }
 
+    /** Which content rows are drive name rows; those use {@link #NAME_ROW_V}. */
+    private boolean[] nameRows = new boolean[0];
+
     /** Top edge (GUI coords) of visible drive {@code k}'s priority button, or -1 when off-screen. */
     private int priorityButtonTop(int k) {
-        int rowY = priorityButtonY(k);
-        return rowY < 0 ? -1 : rowY + 1;
+        return priorityButtonY(k);
     }
 
     /** The per-drive button that opens that drive's own priority screen; its icon shows the state. */

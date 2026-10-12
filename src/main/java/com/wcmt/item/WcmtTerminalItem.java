@@ -23,11 +23,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
- * Wireless terminal that lists and manages the storage cells installed in every ME Drive of the ME
- * network it is linked to.
+ * 无线终端，用于列出并管理它所链接的 ME 网络中每个 ME 驱动器内安装的存储元件。
  *
- * <p>Extends AE2WTlib's {@link ItemWT} so it can be registered as one of its wireless terminals and
- * therefore also be reachable from AE2WTlib's universal terminal.
+ * <p>继承 AE2WTlib 的 {@link ItemWT}，因此可以注册为它的无线终端之一，
+ * 从而也能从 AE2WTlib 的通用终端打开。
  */
 public class WcmtTerminalItem extends ItemWT {
 
@@ -46,8 +45,8 @@ public class WcmtTerminalItem extends ItemWT {
     }
 
     /**
-     * AE2's wireless terminals hard-code two upgrade slots; this one offers four. The callback mirrors
-     * the parent's: it keeps the energy-buffer multiplier in sync with the installed energy cards.
+     * AE2 的无线终端硬编码为两个升级槽位；本终端提供四个。回调与父类一致：
+     * 让能量缓冲倍率与已安装的能量卡保持同步。
      */
     @Override
     public IUpgradeInventory getUpgrades(ItemStack stack) {
@@ -85,9 +84,8 @@ public class WcmtTerminalItem extends ItemWT {
     }
 
     /**
-     * Gate opening on the item actually being this terminal. AE2's link status is not a gate: the
-     * terminal opens while unlinked, out of range or out of power too, and the screen then says why
-     * it cannot be used.
+     * 以物品确实是本终端作为打开的前提。AE2 的链接状态不是前提：
+     * 未链接、超出范围或电力不足时终端也会打开，随后界面会说明它为何不可用。
      */
     private boolean prepareOpen(ItemStack stack) {
         return !stack.isEmpty() && stack.getItem() == this;

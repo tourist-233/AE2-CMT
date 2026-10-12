@@ -20,12 +20,20 @@
       "top": 17
     },
     "scrollingUpgrades": {
-      "right": 35,
+      "right": 29,
       "top": 0
     },
     "upgradeScrollbar": {
-      "right": 16,
+      "right": 10,
       "top": 6
+    },
+    "workbenchUpgrades": {
+      "right": 35,
+      "top": 150
+    },
+    "workbenchUpgradeScrollbar": {
+      "right": 10,
+      "top": 150
     }
   }
 }

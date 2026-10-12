@@ -15,23 +15,21 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 
 /**
- * The cable-mounted variant of the component management terminal.
+ * 元件管理终端的线缆版本。
  *
- * <p>Extending AE2's terminal part gives it everything a cable terminal needs: it requires a channel,
- * has a link status of its own and opens a menu with itself as the host. Only the menu type and the
- * front panel have to be supplied here.
+ * <p>继承 AE2 的终端部件即可获得线缆终端所需的一切：它需要频道、
+ * 拥有自己的链接状态，并以自身为宿主打开菜单。这里只需提供菜单类型和前面板。
  */
 public class WcmtTerminalPart extends AbstractTerminalPart {
 
-    /** This part's own front panel, drawn over the shared chassis and status indicator. */
+    /** 本部件自己的前面板，绘制在共用的外壳与状态指示灯之上。 */
     private static final ResourceLocation MODEL_OFF = ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID,
             "part/cmt_terminal_off");
     private static final ResourceLocation MODEL_ON = ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID,
             "part/cmt_terminal_on");
 
-    // AE2 assembles display parts from three overlapping models: the shared chassis, one of the status
-    // indicators, and the part's own face. The base part picks one of these three according to power
-    // and channel state.
+    // AE2 用三个叠加的模型组装显示部件：共用的外壳、状态指示灯之一，以及部件自己的面板。
+    // 基类部件会根据电力与频道状态从这三个之中选一个。
     private static final IPartModel MODELS_OFF = new PartModel(MODEL_BASE, MODEL_STATUS_OFF, MODEL_OFF);
     private static final IPartModel MODELS_ON = new PartModel(MODEL_BASE, MODEL_STATUS_ON, MODEL_ON);
     private static final IPartModel MODELS_HAS_CHANNEL = new PartModel(MODEL_BASE, MODEL_STATUS_HAS_CHANNEL,
@@ -42,9 +40,8 @@ public class WcmtTerminalPart extends AbstractTerminalPart {
     }
 
     /**
-     * Hands this part's models to AE2, which keeps a table of them and refuses to render a part whose
-     * models are missing from it. Has to run before that table is frozen, so it is called from the mod
-     * constructor rather than lazily from this class' initializer.
+     * 把本部件的模型交给 AE2，AE2 会维护一张模型表，并拒绝渲染模型不在表中的部件。
+     * 这必须在模型表冻结之前执行，因此由模组构造器调用，而不是在本类初始化时惰性调用。
      */
     public static void registerModels() {
         PartModels.registerModels(MODEL_OFF, MODEL_ON);
@@ -53,7 +50,7 @@ public class WcmtTerminalPart extends AbstractTerminalPart {
     @Override
     protected void registerSettings(IConfigManagerBuilder builder) {
         super.registerSettings(builder);
-        // The ordering key is ours; AE2's own SORT_DIRECTION gets registered by the superclass.
+        // 排序键由我们自己定义；AE2 自己的 SORT_DIRECTION 由父类注册。
         builder.registerSetting(WcmtMenu.SORT_MODE, WcmtMenu.SortMode.POSITION);
     }
 

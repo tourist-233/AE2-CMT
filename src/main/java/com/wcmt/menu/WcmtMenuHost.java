@@ -13,8 +13,8 @@ import de.mari_023.ae2wtlib.api.terminal.WTMenuHost;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * Menu host of the terminal. Extends AE2WTlib's {@link WTMenuHost} so the terminal can be part of
- * AE2WTlib's universal terminal (quantum bridge cards, terminal switching, ...).
+ * 终端的菜单宿主。继承 AE2WTlib 的 {@link WTMenuHost}，使终端可成为
+ * AE2WTlib 通用终端的一部分（量子桥接卡、终端切换等）。
  */
 public class WcmtMenuHost extends WTMenuHost {
 
@@ -24,8 +24,8 @@ public class WcmtMenuHost extends WTMenuHost {
     }
 
     /**
-     * The grid reached through the currently connected wireless access point, or null when the
-     * terminal is unlinked / out of range / out of power.
+     * 通过当前连接的无线访问点可达的网络；终端未连接 / 超出范围 /
+     * 电量耗尽时为 null。
      */
     @Nullable
     public IGrid getConnectedGrid() {

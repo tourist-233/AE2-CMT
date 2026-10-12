@@ -5,7 +5,7 @@ import appeng.menu.slot.AppEngSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
-/** A single storage-cell slot of a remotely managed ME Drive. */
+/** 远程管理的 ME 驱动器中的单个存储元件槽位。 */
 public class DriveCellSlot extends AppEngSlot {
 
     private final WcmtMenu menu;

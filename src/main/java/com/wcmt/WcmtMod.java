@@ -34,16 +34,15 @@ public class WcmtMod {
 
     public WcmtMod(IEventBus modEventBus) {
         ModItems.register(modEventBus);
-        // Watches for players coming back from a drive's priority screen.
+        // 监听玩家从驱动器优先级界面返回的情况。
         PriorityReturn.init();
-        // Touch ModMenus so its menu type is queued into AE2's registry before the registry event fires.
+        // 触碰 ModMenus，使其菜单类型在 AE2 的注册事件触发前入队。
         ModMenus.init();
-        // AE2 freezes its part-model table early; the cable terminal's models must be in it by then.
+        // AE2 会较早冻结其部件模型表；线缆终端的模型必须在此前放入表中。
         WcmtTerminalPart.registerModels();
 
-        // Register with AE2WTlib before it collects its wireless terminals, so this terminal is also
-        // reachable from AE2WTlib's universal terminal. The item has to exist already, hence the
-        // eager registration in ModItems.
+        // 在 AE2WTlib 收集其无线终端之前注册，使本终端也能从 AE2WTlib 的通用终端打开。
+        // 物品必须已经存在，因此在 ModItems 中提前注册。
         AddTerminalEvent.register(event -> {
             LOGGER.info("Registering the terminal with AE2WTlib (universal terminal integration)");
             event.builder("cmt",
@@ -64,11 +63,14 @@ public class WcmtMod {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
-            // Make the terminal linkable to a wireless access point like AE2's own terminals.
+            // 让本终端可以像 AE2 自带的终端那样链接到无线访问点。
             GridLinkables.register(ModItems.WCMT_TERMINAL.get(), WirelessTerminalItem.LINKABLE_HANDLER);
-            // Let energy cards go into the terminal's upgrade slots. AE2 only registers them for its
-            // own terminals, so without this the slots would reject every card.
+            // 允许能量卡放入本终端的升级槽位。AE2 只为自己的终端注册了这些卡，
+            // 因此若没有这一步，槽位会拒绝所有能量卡。
             Upgrades.add(AEItems.ENERGY_CARD, ModItems.WCMT_TERMINAL.get(), WcmtMenu.UPGRADE_SLOTS);
+            // 把工作卡注册为本终端真正的升级卡，使 AE2 的槽位校验接受它
+            // （且只在这里接受，其它机器不接受）。
+            Upgrades.add(ModItems.COMPONENT_WORK_CARD.get(), ModItems.WCMT_TERMINAL.get(), 1);
             LOGGER.info("CMT menu registered as {}", BuiltInRegistries.MENU.getKey(ModMenus.WCMT_MENU_TYPE));
         });
     }
@@ -77,6 +79,7 @@ public class WcmtMod {
         if (AECreativeTabIds.MAIN.equals(event.getTabKey())) {
             event.accept(new ItemStack(ModItems.WCMT_TERMINAL.get()));
             event.accept(new ItemStack(ModItems.COMPONENT_MANAGEMENT_TERMINAL.get()));
+            event.accept(new ItemStack(ModItems.COMPONENT_WORK_CARD.get()));
         }
     }
 

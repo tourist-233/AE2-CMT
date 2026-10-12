@@ -19,37 +19,35 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Server -> client snapshot describing the drives currently inside the scrolling window, plus the
- * scroll offset and sort/search state. Cell item stacks themselves are synced through the regular
- * container slots; this payload only carries the per-drive grouping metadata and cell readouts.
+ * 服务端 -> 客户端快照，描述当前位于滚动窗口内的驱动器，以及滚动偏移量和排序/搜索状态。
+ * 元件物品堆本身通过常规容器槽位同步；此数据包只携带各驱动器的分组元数据和元件读数。
  *
- * <p>{@code offset} and {@code totalRows} are counted in content rows (a drive is one name row plus
- * its cell rows), not in drives, so a window shorter than a drive can still show that drive's lower
- * rows. {@code skippedRows} is how many of the first visible drive's rows are scrolled off above the
- * window. {@code blocked} tells the client that the terminal cannot be used right now (unlinked, out
- * of range, out of power or nothing fits) and {@code status} is the text to show for it.
+ * <p>{@code offset} 和 {@code totalRows} 以内容行计数（一个驱动器为一行名称行加上它的元件行），
+ * 而非以驱动器计数，因此比一个驱动器还矮的窗口仍能显示该驱动器靠下的行。{@code skippedRows} 是
+ * 第一个可见驱动器有多少行滚出到窗口上方。{@code blocked} 告知客户端终端当前无法使用（未链接、
+ * 超出范围、电力不足或无可用空间），{@code status} 则是要显示的文本。
  */
 public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, int windowRows,
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
-        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite, boolean sortDesc)
+        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite, boolean sortDesc,
+        boolean workCard, int configScroll, int copyMode, int selectedSlot)
         implements CustomPacketPayload {
 
     /**
-     * Per-cell readout. {@code infinite} means "don't try to reason about the capacity" and drives the
-     * purple capacity bar; {@code capacityInfinite} is narrower — the cell really has no capacity
-     * limit — and is what the network-wide progress grooves react to. {@code typeCapacity} is how many
-     * distinct types this cell can hold (0 when it doesn't report one).
+     * 单个元件的读数。{@code infinite} 表示“不必再去推断容量”，驱动紫色容量条；
+     * {@code capacityInfinite} 范围更窄——该元件确实没有容量上限——全网进度条凹槽响应的是它。
+     * {@code typeCapacity} 是该元件可容纳的不同类型数量（不报告时为 0）。
      */
     public record SlotStat(long used, long total, boolean infinite, boolean capacityInfinite,
             long typeCapacity, long typeUsed, byte state) {
 
-        /** No cell in this slot. */
+        /** 该槽位没有元件。 */
         public static SlotStat absent() {
             return new SlotStat(0, 0, false, false, 0, 0, (byte) CellState.ABSENT.ordinal());
         }
     }
 
-    /** One ME Drive inside the current window; {@code icon} is the drive block's own item. */
+    /** 当前窗口内的一个 ME 驱动器；{@code icon} 是驱动器方块自身的物品。 */
     public record DriveInfo(BlockPos pos, Component name, ItemStack icon, List<SlotStat> slots) {
     }
 
@@ -83,6 +81,10 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         buf.writeVarLong(p.byteTotal());
         buf.writeBoolean(p.infinite());
         buf.writeBoolean(p.sortDesc());
+        buf.writeBoolean(p.workCard());
+        buf.writeVarInt(p.configScroll());
+        buf.writeVarInt(p.copyMode());
+        buf.writeVarInt(p.selectedSlot());
     }
 
     private static DriveSnapshotPayload decode(RegistryFriendlyByteBuf buf) {
@@ -105,8 +107,13 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         long byteTotal = buf.readVarLong();
         boolean infinite = buf.readBoolean();
         boolean sortDesc = buf.readBoolean();
+        boolean workCard = buf.readBoolean();
+        int configScroll = buf.readVarInt();
+        int copyMode = buf.readVarInt();
+        int selectedSlot = buf.readVarInt();
         return new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked, sort, search,
-                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, sortDesc);
+                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, sortDesc, workCard,
+                configScroll, copyMode, selectedSlot);
     }
 
     private static void encodeDrive(RegistryFriendlyByteBuf buf, DriveInfo d) {

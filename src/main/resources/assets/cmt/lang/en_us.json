@@ -1,6 +1,7 @@
 {
   "item.cmt.wireless_component_management_terminal": "Wireless Component Management Terminal",
   "item.cmt.component_management_terminal": "ME Component Management Terminal",
+  "item.cmt.component_work_card": "Component Work Card",
   "gui.cmt.not_connected": "Terminal is not connected to a network",
   "gui.cmt.too_large": "Too many cells to display",
   "gui.cmt.infinite": "Infinite Storage",
@@ -12,5 +13,11 @@
   "gui.cmt.empty_slot": "Empty slot in %s",
   "key.ae2.wireless_cmt_terminal": "Open the Wireless Component Management Terminal",
   "gui.cmt.terminal_title": "Component Management Terminal",
-  "gui.cmt.sort.position": "Position"
+  "gui.cmt.sort.position": "Position",
+  "gui.cmt.band.clear_hint": "Clears the work bench's partition",
+  "gui.cmt.band.copy_state": "Currently: %s",
+  "gui.cmt.band.copy_on": "clear configuration",
+  "gui.cmt.band.copy_off": "do not clear configuration",
+  "gui.cmt.upgrade.select_cell": "Right-click a stored cell to install its upgrade cards",
+  "gui.cmt.upgrade.none": "This cell does not accept upgrade cards"
 }

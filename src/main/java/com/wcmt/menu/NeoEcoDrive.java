@@ -2,15 +2,16 @@ package com.wcmt.menu;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import appeng.api.networking.IManagedGridNode;
-import appeng.api.storage.cells.CellState;
-import appeng.api.storage.cells.ISaveProvider;
-import appeng.api.storage.cells.StorageCell;
 import com.wcmt.WcmtMod;
 import com.wcmt.network.DriveSnapshotPayload;
 import net.minecraft.core.BlockPos;
@@ -23,127 +24,66 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@link ManagedDrive} view of one NeoECO LD storage matrix (the "ECO - LD 存储矩阵驱动器" block).
+ * 一个 NeoECO LD 存储矩阵（「ECO - LD 存储矩阵驱动器」方块）的 {@link ManagedDrive} 视图。
  *
- * <p>A NeoECO storage matrix is a multiblock: several drive blocks share one cluster and every block
- * holds a single cell. One instance of this class therefore represents a whole cluster and exposes
- * one cell slot per drive block. The CD computation drives ("晶阵驱动器") are not storage hosts for
- * us and are ignored.
+ * <p>NeoECO 存储矩阵是多块结构：多个驱动器方块同属一个集群，每个方块保存一个元件。因此本类的
+ * 一个实例代表整个集群，并为每个驱动器方块暴露一个元件槽位。CD 计算驱动器（「晶阵驱动器」）
+ * 对我们而言不是存储宿主，会被忽略。
  *
- * <p>NeoECO is an optional mod and its drives do not extend AE2's {@code DriveBlockEntity}, so
- * everything is done reflectively: the class and method lookups happen once and simply fail to
- * resolve when the mod is missing, leaving the terminal unaffected.
+ * <p>元件槽与容量读数走 NeoECO 的公开 API（见 {@link NeoEcoSupport}）：那是编译期依赖，模组
+ * 缺失时这些类不会被加载。集群、控制器、宿主节点与方块界面 NeoECO 没有对外暴露，仍以反射
+ * 访问；模组缺失时 {@link #collect} 直接返回空列表，终端不受影响。
  */
 final class NeoEcoDrive implements ManagedDrive {
 
-    private static final String CELL_HOST_CLASS = "cn.dancingsnow.neoecoae.util.ICellHost";
-    private static final String STORAGE_DRIVE_CLASS = "cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity";
-    private static final String CELL_REGISTRY_CLASS = "cn.dancingsnow.neoecoae.api.storage.ECOStorageCells";
-    private static final String CELL_INTERFACE = "cn.dancingsnow.neoecoae.api.storage.IECOStorageCell";
+    private static final String STORAGE_DRIVE_CLASS =
+            "cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity";
     private static final String BLOCK_ENTITY_BASE = "cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity";
 
     private static final Class<?> storageDriveClass;
-    private static final Method getCellStack;
-    private static final Method setCellStack;
-    private static final Method isItemValid;
-    private static final Method canExtractCell;
-    private static final Method getCellInventory;
-    private static final Method getUsedBytes;
-    private static final Method getTotalBytes;
-    /** How many distinct types a cell can hold; not every NeoECO version reports it. */
-    private static final Method getTotalItemTypes;
-    /** How many distinct types a cell currently holds. */
-    private static final Method getStoredItemTypes;
-    private static final Method getStatus;
     private static final Method getMainNode;
     private static final Method getCluster;
-    /** {@code ECODriveBlockEntity#isLockedByInfiniteMode()}: null when that API is missing. */
+    /** {@code ECODriveBlockEntity#isLockedByInfiniteMode()}：该 API 缺失时为 null。 */
     private static final Method isLockedByInfiniteMode;
     /**
-     * LDLib2's entry point for a block's own screen ({@code BlockUIMenuType.openUI}). NeoECO brings
-     * LDLib2 with it, but the terminal does not depend on it, so this is looked up reflectively.
+     * LDLib2 用于打开方块自身界面的入口（{@code BlockUIMenuType.openUI}）。NeoECO 会带上
+     * LDLib2，但终端并不依赖它，所以这里以反射查找。
      */
     private static final Method openBlockUi;
 
     static {
         Class<?> driveClass = null;
-        Method readCell = null;
-        Method writeCell = null;
-        Method valid = null;
-        Method extract = null;
-        Method status = null;
-        Method cluster = null;
         try {
             driveClass = Class.forName(STORAGE_DRIVE_CLASS);
-            Class<?> hostClass = Class.forName(CELL_HOST_CLASS);
-            readCell = hostClass.getMethod("getCellStack");
-            writeCell = hostClass.getMethod("setCellStack", ItemStack.class);
-            valid = hostClass.getMethod("isItemValid", ItemStack.class);
-            extract = hostClass.getMethod("canExtractCell");
-            status = StorageCell.class.getMethod("getStatus");
-            cluster = findMethod(driveClass, "getCluster");
         } catch (ClassNotFoundException e) {
-            // NeoECO is simply not installed: stay inert and quiet.
+            // NeoECO 根本没安装：保持沉默不做任何事。
             driveClass = null;
-        } catch (ReflectiveOperationException | LinkageError e) {
-            WcmtMod.LOGGER.warn("NeoECO is installed but its cell-host API did not match; "
+        } catch (LinkageError e) {
+            WcmtMod.LOGGER.warn("NeoECO is installed but its drive class did not load; "
                     + "NeoECO storage matrices will be ignored", e);
             driveClass = null;
         }
-        Method inventory = null;
-        Method used = null;
-        Method total = null;
-        try {
-            inventory = Class.forName(CELL_REGISTRY_CLASS)
-                    .getMethod("getCellInventory", ItemStack.class, ISaveProvider.class);
-            Class<?> cellInterface = Class.forName(CELL_INTERFACE);
-            used = cellInterface.getMethod("getUsedBytes");
-            total = cellInterface.getMethod("getTotalBytes");
-        } catch (ReflectiveOperationException | LinkageError e) {
-            // Without the cell registry we can still move cells, just not read their capacity.
-            inventory = null;
-            used = null;
-            total = null;
-        }
+        storageDriveClass = driveClass;
+        // 这几项都不在 NeoECO 的 api 包里，只能继续反射。
+        getCluster = driveClass == null ? null : findMethod(driveClass, "getCluster");
+        isLockedByInfiniteMode = driveClass == null
+                ? null
+                : findMethod(driveClass, "isLockedByInfiniteMode");
         Method node = null;
         try {
             node = findMethod(Class.forName(BLOCK_ENTITY_BASE), "getMainNode");
         } catch (ReflectiveOperationException | LinkageError e) {
             node = null;
         }
-        Method types = null;
-        Method usedTypes = null;
-        try {
-            Class<?> cellInterface = Class.forName(CELL_INTERFACE);
-            types = findMethod(cellInterface, "getTotalItemTypes");
-            usedTypes = findMethod(cellInterface, "getStoredItemTypes");
-        } catch (ReflectiveOperationException | LinkageError e) {
-            types = null;
-            usedTypes = null;
-        }
-        Method infiniteMode = driveClass == null ? null : findMethod(driveClass, "isLockedByInfiniteMode");
-        storageDriveClass = driveClass;
-        openBlockUi = findOpenBlockUi();
-        getCellStack = readCell;
-        setCellStack = writeCell;
-        isItemValid = valid;
-        canExtractCell = extract;
-        getCellInventory = inventory;
-        getUsedBytes = used;
-        getTotalBytes = total;
-        getStatus = status;
         getMainNode = node;
-        getCluster = cluster;
-        isLockedByInfiniteMode = infiniteMode;
-        getTotalItemTypes = types;
-        getStoredItemTypes = usedTypes;
+        openBlockUi = findOpenBlockUi();
     }
 
-    /** Drive blocks of one cluster, ordered by position so a cell keeps its slot while scrolling. */
+    /** 一个集群的驱动器方块，按位置排序，使滚动时元件保持其槽位。 */
     private final List<BlockEntity> parts;
     /**
-     * The cluster's storage-system host ("可拓展存储系统主机"), or null while the multiblock is not
-     * formed. The host is what determines the tier (L4/L6/L9), so the entry is shown as the host.
+     * 集群的存储系统主机（「可拓展存储系统主机」），多块结构未成型时为 null。
+     * 主机决定了等级（L4/L6/L9），因此条目以主机形式展示。
      */
     @Nullable
     private final BlockEntity controller;
@@ -153,27 +93,26 @@ final class NeoEcoDrive implements ManagedDrive {
         this.controller = controller;
     }
 
-    /** One managed drive per cluster; owners that are not LD storage matrix blocks are ignored. */
+    /** 每个集群一个被管理的驱动器；不是 LD 存储矩阵方块的宿主会被忽略。 */
     static List<ManagedDrive> collect(List<BlockEntity> owners) {
         if (storageDriveClass == null) {
             return List.of();
         }
         List<ManagedDrive> result = new ArrayList<>();
-        List<Object> seenClusters = new ArrayList<>();
+        Set<Object> seenClusters = Collections.newSetFromMap(new IdentityHashMap<>());
         for (BlockEntity owner : owners) {
             if (!isStorageDrive(owner)) {
                 continue;
             }
             Object cluster = getCluster == null ? null : invoke(getCluster, owner);
             if (cluster == null) {
-                // Not part of a formed cluster (yet): show it on its own.
+                // （尚）不属于已成型集群：单独展示它。
                 result.add(new NeoEcoDrive(List.of(owner), null));
                 continue;
             }
-            if (seenClusters.contains(cluster)) {
+            if (!seenClusters.add(cluster)) {
                 continue;
             }
-            seenClusters.add(cluster);
             List<BlockEntity> parts = drivesOf(cluster);
             result.add(new NeoEcoDrive(parts.isEmpty() ? List.of(owner) : parts, controllerOf(cluster)));
         }
@@ -185,7 +124,7 @@ final class NeoEcoDrive implements ManagedDrive {
     }
 
     private static List<BlockEntity> drivesOf(Object cluster) {
-        Method getDrives = findMethod(cluster.getClass(), "getDrives");
+        Method getDrives = cachedMethod(cluster.getClass(), "getDrives");
         if (getDrives == null || !(invoke(getDrives, cluster) instanceof List<?> list)) {
             return List.of();
         }
@@ -200,7 +139,7 @@ final class NeoEcoDrive implements ManagedDrive {
         return parts;
     }
 
-    /** Resolves LDLib2's block-UI opener, or null when NeoECO (and LDLib2) is not installed. */
+    /** 解析 LDLib2 的方块界面打开器；NeoECO（及 LDLib2）未安装时为 null。 */
     private static Method findOpenBlockUi() {
         try {
             return Class.forName("com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType")
@@ -211,8 +150,8 @@ final class NeoEcoDrive implements ManagedDrive {
     }
 
     /**
-     * The priority of a NeoECO storage system belongs to the multiblock's host, so the host's screen
-     * (which contains the priority control) is opened rather than any drive block's.
+     * NeoECO 存储系统的优先级属于多块结构的主机，因此打开的是主机的界面（其中包含优先级
+     * 控件），而非任何驱动器方块的界面。
      */
     @Override
     public boolean openPriority(ServerPlayer player) {
@@ -223,41 +162,53 @@ final class NeoEcoDrive implements ManagedDrive {
             openBlockUi.invoke(null, player, controller.getBlockPos());
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            if (REPORTED_FAILURES.add("openUI")) {
-                WcmtMod.LOGGER.warn("Could not open the NeoECO storage host screen", e);
-            }
+            reportOnce("openUI", e);
             return false;
         }
     }
 
-    private static Method findMethod(Class<?> start, String name) {        for (Class<?> type = start; type != null; type = type.getSuperclass()) {
+    /** 按「类#方法名」缓存反射查找结果，未找到的也记住，避免每次刷新重走一遍父类链。 */
+    private static final Map<String, Optional<Method>> METHOD_CACHE = new ConcurrentHashMap<>();
+
+    private static Method cachedMethod(Class<?> type, String name) {
+        return METHOD_CACHE.computeIfAbsent(type.getName() + '#' + name,
+                key -> Optional.ofNullable(findMethod(type, name))).orElse(null);
+    }
+
+    private static Method findMethod(Class<?> start, String name) {
+        for (Class<?> type = start; type != null; type = type.getSuperclass()) {
             try {
                 Method method = type.getDeclaredMethod(name);
                 method.setAccessible(true);
                 return method;
             } catch (NoSuchMethodException ignored) {
-                // keep walking up
+                // 继续向上查找父类
             } catch (RuntimeException e) {
-                // Not accessible after all (module or security manager): give up on this lookup.
+                // 最终还是不可访问（模块或安全管理器）：放弃这次查找。
                 return null;
             }
         }
         return null;
     }
 
-    /** Methods already reported as failing, so a broken bridge warns once instead of every tick. */
+    /** 已报告过失败的方法，使损坏的桥接只警告一次，而非每 tick 都警告。 */
     private static final Set<String> REPORTED_FAILURES = ConcurrentHashMap.newKeySet();
+
+    /** 记录一次桥接失败；同名的只警告一次。 */
+    static void reportOnce(String what, Throwable error) {
+        if (REPORTED_FAILURES.add(what)) {
+            WcmtMod.LOGGER.warn("NeoECO bridge call {} failed; the drive still works but reports "
+                    + "no data for it", what, error);
+        }
+    }
 
     private static Object invoke(Method method, Object target, Object... args) {
         try {
             return method.invoke(target, args);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            // Whatever goes wrong (changed signature, missing class, rejected argument) must degrade to
-            // "no value" rather than escape into the menu's tick, but it should not vanish silently.
-            if (REPORTED_FAILURES.add(method.getName())) {
-                WcmtMod.LOGGER.warn("NeoECO bridge call {}() failed; the drive still works but reports "
-                        + "no data for it", method.getName(), e);
-            }
+            // 无论出什么问题（签名变更、类缺失、参数被拒）都必须降级为「无值」，而不是
+            // 逸出到菜单的 tick 中，但也不应静默消失。
+            reportOnce(method.getName(), e);
             return null;
         }
     }
@@ -266,9 +217,9 @@ final class NeoEcoDrive implements ManagedDrive {
         return slot >= 0 && slot < parts.size() ? parts.get(slot) : null;
     }
 
-    /** The cluster's storage-system host block entity, or null when it has none. */
+    /** 集群的存储系统主机方块实体，没有时为 null。 */
     private static BlockEntity controllerOf(Object cluster) {
-        Method getController = findMethod(cluster.getClass(), "getController");
+        Method getController = cachedMethod(cluster.getClass(), "getController");
         return getController != null && invoke(getController, cluster) instanceof BlockEntity host
                 && !host.isRemoved()
                 ? host
@@ -276,8 +227,8 @@ final class NeoEcoDrive implements ManagedDrive {
     }
 
     /**
-     * The block this entry is labelled and iconed with: the host when the cluster is formed (its block
-     * carries the tier, e.g. "ECO - L4 可拓展存储系统主机"), otherwise the first drive block.
+     * 条目用于命名和图标显示的方块：集群成型时为该主机（其方块带有等级，例如
+     * 「ECO - L4 可拓展存储系统主机」），否则为第一个驱动器方块。
      */
     private BlockEntity displayEntity() {
         return controller != null ? controller : parts.get(0);
@@ -327,85 +278,56 @@ final class NeoEcoDrive implements ManagedDrive {
     @Override
     public ItemStack cell(int slot) {
         BlockEntity part = part(slot);
-        if (part == null || getCellStack == null) {
+        if (part == null) {
             return ItemStack.EMPTY;
         }
-        return invoke(getCellStack, part) instanceof ItemStack stack ? stack : ItemStack.EMPTY;
+        ItemStack stack = NeoEcoSupport.getCellStack(part);
+        return stack == null ? ItemStack.EMPTY : stack;
     }
 
     @Override
     public boolean acceptsCell(int slot, ItemStack stack) {
         BlockEntity part = part(slot);
-        if (part == null || stack.isEmpty() || isItemValid == null) {
-            return false;
-        }
-        return Boolean.TRUE.equals(invoke(isItemValid, part, stack));
+        return part != null && !stack.isEmpty() && NeoEcoSupport.isItemValid(part, stack);
     }
 
     @Override
     public boolean canExtractCell(int slot) {
         BlockEntity part = part(slot);
-        if (part == null || canExtractCell == null) {
-            return false;
-        }
-        return Boolean.TRUE.equals(invoke(canExtractCell, part));
+        return part != null && NeoEcoSupport.canExtractCell(part);
     }
 
     @Override
     public void setCell(int slot, ItemStack stack) {
         BlockEntity part = part(slot);
-        if (part == null || setCellStack == null) {
+        if (part == null) {
             return;
         }
-        try {
-            // The host expects null (not an empty stack) to clear its cell.
-            setCellStack.invoke(part, new Object[] { stack.isEmpty() ? null : stack.copyWithCount(1) });
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            WcmtMod.LOGGER.warn("Could not update the cell of a NeoECO storage matrix", e);
-        }
+        // 宿主只认 null 作为清空请求，空物品堆会被它拒绝（见 NeoEcoSupport）。
+        NeoEcoSupport.setCellStack(part, stack);
     }
 
     @Override
     public DriveSnapshotPayload.SlotStat stat(int slot) {
-        Object inventory = cellInventory(slot);
-        if (inventory == null) {
+        BlockEntity part = part(slot);
+        if (part == null) {
             return DriveSnapshotPayload.SlotStat.absent();
         }
-        try {
-            long used = ((Number) getUsedBytes.invoke(inventory)).longValue();
-            long total = ((Number) getTotalBytes.invoke(inventory)).longValue();
-            byte state = getStatus.invoke(inventory) instanceof CellState cellState
-                    ? (byte) cellState.ordinal()
-                    : (byte) CellState.ABSENT.ordinal();
-            long typeCapacity = 0;
-            long typeUsed = 0;
-            if (getTotalItemTypes != null) {
-                Object reported = invoke(getTotalItemTypes, inventory);
-                if (reported instanceof Number number) {
-                    typeCapacity = number.longValue();
-                }
-            }
-            if (getStoredItemTypes != null) {
-                Object reported = invoke(getStoredItemTypes, inventory);
-                if (reported instanceof Number number) {
-                    typeUsed = number.longValue();
-                }
-            }
-            // Unlimited storage in NeoECO means the cluster runs in infinite mode; a cell that only
-            // supplies infinite resources (the infinite material matrix) still shows a purple bar.
-            // Only the former is a genuine capacity limit, which the progress grooves react to.
-            boolean clusterInfinite = inInfiniteMode(part(slot));
-            boolean infinite = clusterInfinite || ManagedDrive.isInfiniteItem(cell(slot));
-            return new DriveSnapshotPayload.SlotStat(used, total, infinite, clusterInfinite, typeCapacity,
-                    typeUsed, state);
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+        NeoEcoSupport.CellStats stats = NeoEcoSupport.readStats(part, cell(slot));
+        if (!stats.present()) {
             return DriveSnapshotPayload.SlotStat.absent();
         }
+        // NeoECO 中的无限存储指集群运行在无限模式；仅提供无限资源的元件（无限材料矩阵）
+        // 仍会显示紫色条。只有前者才是真正的容量限制，进度槽会对此作出反应。
+        boolean clusterInfinite = inInfiniteMode(part);
+        boolean infinite = clusterInfinite || ManagedDrive.isInfiniteItem(cell(slot));
+        return new DriveSnapshotPayload.SlotStat(stats.used(), stats.total(), infinite, clusterInfinite,
+                stats.typeCapacity(), stats.typeUsed(), stats.status());
     }
 
     /**
-     * True when the cluster this drive belongs to currently runs in NeoECO's infinite mode. The
-     * infinite "member" cell item alone does not mean unlimited storage, so it must not be used here.
+     * 该驱动器所属集群当前是否运行在 NeoECO 的无限模式。仅靠无限「成员」元件物品并不代表无限
+     * 存储，因此这里不能依据它判断。
      */
     private static boolean inInfiniteMode(BlockEntity part) {
         if (part == null || isLockedByInfiniteMode == null) {
@@ -424,24 +346,5 @@ final class NeoEcoDrive implements ManagedDrive {
             total += stat.total();
         }
         return total > 0 ? (double) used / total : 0;
-    }
-
-    /** The cell's {@code IECOStorageCell} (an AE2 {@link StorageCell}), or null. */
-    private Object cellInventory(int slot) {
-        BlockEntity part = part(slot);
-        if (part == null || getCellInventory == null || getUsedBytes == null || getTotalBytes == null
-                || getStatus == null) {
-            return null;
-        }
-        ItemStack cell = cell(slot);
-        if (cell.isEmpty()) {
-            return null;
-        }
-        try {
-            Object saveProvider = part instanceof ISaveProvider provider ? provider : null;
-            return getCellInventory.invoke(null, cell, saveProvider);
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
-            return null;
-        }
     }
 }

@@ -15,7 +15,7 @@ public final class WcmtClientSetup {
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         InitScreens.register(event, ModMenus.WCMT_MENU_TYPE, WcmtScreen::new, "/screens/cmt.json");
-        // The cable-mounted part shares the menu and screen, but not the title on the sheet.
+        // 线缆部件共用菜单与界面，但不共用界面标题。
         InitScreens.register(event, ModMenus.WCMT_PART_MENU_TYPE, WcmtScreen::new, "/screens/cmt_part.json");
     }
 

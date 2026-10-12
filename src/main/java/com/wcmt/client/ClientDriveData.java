@@ -8,7 +8,7 @@ import com.wcmt.network.DriveSnapshotPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-/** Latest drive snapshot received from the server while a terminal is open. */
+/** 终端打开期间从服务端收到的最新驱动器快照。 */
 public final class ClientDriveData {
 
     private static DriveSnapshotPayload snapshot;
@@ -29,31 +29,51 @@ public final class ClientDriveData {
         return snapshot;
     }
 
-    /** Total content rows of all drives; a drive spans a name row plus its cell rows. */
+    /** 所有驱动器的内容总行数；一个驱动器占一行名称行加上它的元件行。 */
     public static int totalRows() {
         return snapshot == null ? 0 : snapshot.totalRows();
     }
 
-    /** Rows the server is currently showing; the scroll range has to use this, not our own guess. */
+    /** 服务端当前显示的行数；滚动范围必须以此为准，而不是我们自己猜测的值。 */
     public static int windowRows() {
         return snapshot == null ? 0 : snapshot.windowRows();
     }
 
-    /** Empty while the terminal is usable, otherwise why it cannot reach the network. */
+    /** 终端可用时为空，否则是不能连接网络的原因。 */
     public static Component status() {
         return snapshot == null ? Component.empty() : snapshot.status();
     }
 
-    /** True while the terminal cannot be used (unlinked, out of range, out of power, nothing fits). */
+    /** 终端无法使用时为 true（未链接、超出范围、电力不足、无可用空间）。 */
     public static boolean blocked() {
         return snapshot != null && snapshot.blocked();
+    }
+
+    /** 升级槽位中装有元件工作卡时为 true；此时界面会多绘制一条区域。 */
+    public static boolean workCard() {
+        return snapshot != null && snapshot.workCard();
+    }
+
+    /** 该区域显示工作卡分区网格的哪一步。 */
+    public static int configScroll() {
+        return snapshot == null ? 0 : snapshot.configScroll();
+    }
+
+    /** 工作台复制模式，{@link appeng.api.config.CopyMode#ordinal()}。 */
+    public static int copyMode() {
+        return snapshot == null ? 0 : snapshot.copyMode();
+    }
+
+    /** 玩家最后右键点击的元件所在的驱动器槽位索引，无则为 -1。 */
+    public static int selectedSlot() {
+        return snapshot == null ? -1 : snapshot.selectedSlot();
     }
 
     public static List<DriveSnapshotPayload.DriveInfo> drives() {
         return snapshot == null ? List.of() : snapshot.drives();
     }
 
-    /** Network-wide totals shown by the two grooves beside the player inventory. */
+    /** 玩家物品栏旁两条凹槽显示的全网总计。 */
     public static long typeUsed() {
         return snapshot == null ? 0 : snapshot.typeUsed();
     }
@@ -70,17 +90,17 @@ public final class ClientDriveData {
         return snapshot == null ? 0 : snapshot.byteTotal();
     }
 
-    /** True while any cell the network holds is unlimited. */
+    /** 网络中只要有任意元件为无限，就为 true。 */
     public static boolean infinite() {
         return snapshot != null && snapshot.infinite();
     }
 
-    /** Ordering key last reported by the server, used to initialise the sort button. */
+    /** 服务端最后上报的排序键，用于初始化排序按钮。 */
     public static WcmtMenu.SortMode sortMode() {
         return snapshot == null ? WcmtMenu.SortMode.POSITION : WcmtMenu.SortMode.valueOf(snapshot.sort());
     }
 
-    /** True when the server orders the drives bottom-to-top. */
+    /** 服务端按从下到上的顺序排列驱动器时为 true。 */
     public static boolean sortDescending() {
         return snapshot != null && snapshot.sortDesc();
     }

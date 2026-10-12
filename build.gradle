@@ -48,6 +48,13 @@ repositories {
             includeGroup "curse.maven"
         }
     }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -110,6 +117,11 @@ dependencies {
     // the library mod itself is not installed. The full mod is dev-runtime only.
     jarJar(implementation("de.mari_023:ae2wtlib_api:${ae2wtlib_version}"))
     localRuntime "de.mari_023:ae2wtlib:${ae2wtlib_version}"
+
+    // NeoECO (Neo ECO AE Extension) is optional: compiling against its public API lets the ECO
+    // storage matrices be read through the mod's own interfaces instead of reflection, while the
+    // runtime guard keeps it out of the classpath when NeoECO is not installed. Never bundled.
+    compileOnly "maven.modrinth:neoecoae:${neoecoae_version}"
 
     // Minecraft's LWJGL dependency only carries x64 natives, but this container is aarch64.
     // Supplying the matching native jars lets the headless dev client run here; no effect elsewhere.

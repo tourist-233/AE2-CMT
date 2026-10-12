@@ -10,15 +10,25 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: change scroll window / sort mode / search text of an open terminal. */
+/** 客户端 -> 服务端：更改已打开终端的滚动窗口 / 排序模式 / 搜索文本。 */
 public record WcmtActionPayload(int action, int a, int b, String text) implements CustomPacketPayload {
 
     public static final int ACTION_LAYOUT = 0;
     public static final int ACTION_SORT = 1;
     public static final int ACTION_SEARCH = 2;
     public static final int ACTION_SORT_DIRECTION = 3;
-    /** Opens the priority screen of the drive selected by {@code a} (its index in the snapshot). */
+    /** 打开由 {@code a} 选中的驱动器的优先级界面（{@code a} 为它在快照中的索引）。 */
     public static final int ACTION_PRIORITY = 4;
+    /** 将工作卡的分区网格滚动到第 {@code a} 步。 */
+    public static final int ACTION_CONFIG_SCROLL = 5;
+    /** 工作台：将当前选中元件的内容捕获到分区网格。 */
+    public static final int ACTION_PARTITION = 6;
+    /** 工作台：清空分区网格。 */
+    public static final int ACTION_CLEAR = 7;
+    /** 工作台：切换复制模式。 */
+    public static final int ACTION_COPY_MODE = 8;
+    /** 右键点击了已存储的元件：选中它并将分区网格应用到它。{@code a} 是它的驱动器槽位索引。 */
+    public static final int ACTION_APPLY_CELL = 9;
 
     public static final Type<WcmtActionPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID, "action"));

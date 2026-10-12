@@ -9,14 +9,13 @@ import appeng.api.inventories.BaseInternalInventory;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Backing inventory for the terminal's drive cell slots.
+ * 终端驱动器元件槽位的底层 inventory。
  *
- * <p>The slot pool is contiguous: each visible drive occupies {@code cellCount()} consecutive slots,
- * so drives with a different number of cells (vanilla 10, extended 20, a NeoECO host's 1, ...) are
- * handled the same way.
+ * <p>槽位池是连续的：每个可见驱动器占用 {@code cellCount()} 个连续槽位，因此元件数不同的
+ * 驱动器（原版 10、扩展 20、NeoECO 宿主的 1 等）都以相同方式处理。
  *
- * <p>Server side the pool delegates to the actual drives through {@link ManagedDrive}; client side it
- * simply stores the stacks synchronised by the vanilla container.
+ * <p>服务端槽位池通过 {@link ManagedDrive} 委托给真实驱动器；客户端仅保存由原版容器同步的
+ * 物品堆。
  */
 public class PagedDriveInventory extends BaseInternalInventory {
 
@@ -24,41 +23,45 @@ public class PagedDriveInventory extends BaseInternalInventory {
     private final WcmtMenu menu;
     private final ItemStack[] mirror;
     private List<ManagedDrive> drives = List.of();
+    /**
+     * 槽位到「驱动器下标 / 驱动器内位置」的映射，随 {@link #setDrives} 重建。
+     * 容器每 tick 会问遍所有槽位，逐个线性查驱动器会在驱动器一多时被放大。
+     */
+    private final int[] slotDrive = new int[WcmtMenu.MAX_SLOTS];
+    private final int[] slotLocal = new int[WcmtMenu.MAX_SLOTS];
 
     public PagedDriveInventory(boolean server, WcmtMenu menu) {
         this.server = server;
         this.menu = menu;
         this.mirror = new ItemStack[WcmtMenu.MAX_SLOTS];
         Arrays.fill(this.mirror, ItemStack.EMPTY);
+        Arrays.fill(this.slotDrive, -1);
     }
 
     public void setDrives(List<ManagedDrive> drives) {
         this.drives = drives;
+        Arrays.fill(slotDrive, -1);
+        int slot = 0;
+        for (int k = 0; k < drives.size() && slot < slotDrive.length; k++) {
+            int cells = drives.get(k).cellCount();
+            for (int local = 0; local < cells && slot < slotDrive.length; local++, slot++) {
+                slotDrive[slot] = k;
+                slotLocal[slot] = local;
+            }
+        }
     }
 
     @Nullable
     private ManagedDrive driveFor(int slot) {
-        int acc = 0;
-        for (ManagedDrive drive : drives) {
-            int cells = drive.cellCount();
-            if (slot < acc + cells) {
-                return drive;
-            }
-            acc += cells;
+        if (slot < 0 || slot >= slotDrive.length) {
+            return null;
         }
-        return null;
+        int k = slotDrive[slot];
+        return k >= 0 && k < drives.size() ? drives.get(k) : null;
     }
 
     private int localSlot(int slot) {
-        int acc = 0;
-        for (ManagedDrive drive : drives) {
-            int cells = drive.cellCount();
-            if (slot < acc + cells) {
-                return slot - acc;
-            }
-            acc += cells;
-        }
-        return -1;
+        return slot >= 0 && slot < slotLocal.length ? slotLocal[slot] : -1;
     }
 
     @Override
@@ -93,7 +96,7 @@ public class PagedDriveInventory extends BaseInternalInventory {
         }
         ManagedDrive drive = driveFor(slot);
         if (drive != null) {
-            // A cell slot holds exactly one cell; never trust the incoming amount.
+            // 元件槽位只保存一个元件，不要相信传入的数量。
             drive.setCell(localSlot(slot), stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
         }
     }
@@ -106,14 +109,14 @@ public class PagedDriveInventory extends BaseInternalInventory {
     @Override
     public boolean isItemValid(int slot, ItemStack stack) {
         if (!server) {
-            // Client-side prediction: only slots that currently have a backing drive accept items.
+            // 客户端预测：只有当前有对应驱动器的槽位才接受物品。
             return menu.isSlotActive(slot);
         }
         if (!menu.canInsert()) {
             return false;
         }
-        // A slot without a backing drive (outside the current window) must never accept items,
-        // otherwise setItemDirect silently drops them.
+        // 没有对应驱动器（在当前窗口之外）的槽位绝不能接受物品，否则 setItemDirect
+        // 会静默丢弃它们。
         ManagedDrive drive = driveFor(slot);
         return drive != null && drive.acceptsCell(localSlot(slot), stack);
     }

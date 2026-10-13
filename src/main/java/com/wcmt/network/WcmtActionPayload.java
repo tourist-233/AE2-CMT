@@ -29,6 +29,8 @@ public record WcmtActionPayload(int action, int a, int b, String text) implement
     public static final int ACTION_COPY_MODE = 8;
     /** 右键点击了已存储的元件：选中它并将分区网格应用到它。{@code a} 是它的驱动器槽位索引。 */
     public static final int ACTION_APPLY_CELL = 9;
+    /** 设置所选元件的模糊模式；{@code a} 是 {@code FuzzyMode} 的序号。 */
+    public static final int ACTION_FUZZY_MODE = 10;
 
     public static final Type<WcmtActionPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(WcmtMod.MOD_ID, "action"));

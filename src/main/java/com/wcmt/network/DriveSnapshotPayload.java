@@ -25,18 +25,21 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * <p>{@code offset} 和 {@code totalRows} 以内容行计数（一个驱动器为一行名称行加上它的元件行），
  * 而非以驱动器计数，因此比一个驱动器还矮的窗口仍能显示该驱动器靠下的行。{@code skippedRows} 是
  * 第一个可见驱动器有多少行滚出到窗口上方。{@code blocked} 告知客户端终端当前无法使用（未链接、
- * 超出范围、电力不足或无可用空间），{@code status} 则是要显示的文本。
+ * 超出范围、电力不足或无可用空间），{@code status} 则是要显示的文本。{@code infinite} 表示网络中有元件的
+ * 字节容量不受限，{@code typeInfinite} 表示有元件的类型数不受限（例如 omni 的通用元件）；两条进度凹槽各看其中一个。
  */
 public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, int windowRows,
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
-        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite, boolean sortDesc,
+        long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite,
+        boolean typeInfinite, boolean sortDesc,
         boolean workCard, int configScroll, int copyMode, int selectedSlot)
         implements CustomPacketPayload {
 
     /**
      * 单个元件的读数。{@code infinite} 表示“不必再去推断容量”，驱动紫色容量条；
      * {@code capacityInfinite} 范围更窄——该元件确实没有容量上限——全网进度条凹槽响应的是它。
-     * {@code typeCapacity} 是该元件可容纳的不同类型数量（不报告时为 0）。
+     * {@code typeCapacity} 是该元件可容纳的不同类型数量：0 表示不报告，负数表示类型数不受限
+     * （NeoECO 的 omni 元件即如此，全网的存储类型凹槽据此显示为无限）。
      */
     public record SlotStat(long used, long total, boolean infinite, boolean capacityInfinite,
             long typeCapacity, long typeUsed, byte state) {
@@ -47,8 +50,12 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         }
     }
 
-    /** 当前窗口内的一个 ME 驱动器；{@code icon} 是驱动器方块自身的物品。 */
-    public record DriveInfo(BlockPos pos, Component name, ItemStack icon, List<SlotStat> slots) {
+    /**
+     * 当前窗口内的一个 ME 驱动器；{@code icon} 是驱动器方块自身的物品，{@code eco} 表示它是
+     * NeoECO 的存储矩阵（界面据此换用优先级图案）。
+     */
+    public record DriveInfo(BlockPos pos, Component name, ItemStack icon, List<SlotStat> slots,
+            boolean eco) {
     }
 
     public static final Type<DriveSnapshotPayload> TYPE = new Type<>(
@@ -80,6 +87,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         buf.writeVarLong(p.byteUsed());
         buf.writeVarLong(p.byteTotal());
         buf.writeBoolean(p.infinite());
+        buf.writeBoolean(p.typeInfinite());
         buf.writeBoolean(p.sortDesc());
         buf.writeBoolean(p.workCard());
         buf.writeVarInt(p.configScroll());
@@ -106,13 +114,15 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         long byteUsed = buf.readVarLong();
         long byteTotal = buf.readVarLong();
         boolean infinite = buf.readBoolean();
+        boolean typeInfinite = buf.readBoolean();
         boolean sortDesc = buf.readBoolean();
         boolean workCard = buf.readBoolean();
         int configScroll = buf.readVarInt();
         int copyMode = buf.readVarInt();
         int selectedSlot = buf.readVarInt();
         return new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked, sort, search,
-                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, sortDesc, workCard,
+                status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, typeInfinite, sortDesc,
+                workCard,
                 configScroll, copyMode, selectedSlot);
     }
 
@@ -124,6 +134,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         for (SlotStat stat : d.slots()) {
             encodeStat(buf, stat);
         }
+        buf.writeBoolean(d.eco());
     }
 
     private static DriveInfo decodeDrive(RegistryFriendlyByteBuf buf) {
@@ -135,7 +146,8 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         for (int i = 0; i < statCount; i++) {
             slots.add(decodeStat(buf));
         }
-        return new DriveInfo(pos, name, icon, slots);
+        boolean eco = buf.readBoolean();
+        return new DriveInfo(pos, name, icon, slots, eco);
     }
 
     private static void encodeStat(RegistryFriendlyByteBuf buf, SlotStat s) {

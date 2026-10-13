@@ -3,12 +3,12 @@ package com.wcmt.client;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 import appeng.api.config.Settings;
 import appeng.api.config.TerminalStyle;
 import appeng.api.upgrades.Upgrades;
 import appeng.api.config.CopyMode;
+import appeng.api.config.FuzzyMode;
 import appeng.client.Point;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
@@ -19,6 +19,7 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.client.gui.widgets.UpgradesPanel;
 import appeng.core.AEConfig;
+import appeng.core.localization.Tooltips;
 import appeng.menu.SlotSemantics;
 import appeng.menu.slot.AppEngSlot;
 import com.wcmt.init.ModItems;
@@ -90,15 +91,25 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int SORT_ICON_H = 13;
 
     /**
-     * 驱动器名称行右端的优先级按钮：其三种状态在图集中并排排列（空闲、悬停、按下）。
+     * 驱动器名称行右端的优先级按钮：底图是并排的三个 16x16 方块（空闲、悬停、按下），
+     * 图案另叠在中央。
      */
-    private static final int PRIORITY_ICON_V = 0;
-    private static final int PRIORITY_ICON_SIZE = 16;
-    private static final int PRIORITY_ICON_U_IDLE = 37;
-    private static final int PRIORITY_ICON_U_HOVER = 53;
-    private static final int PRIORITY_ICON_U_DOWN = 69;
-    /** 图标为 16x16，而按钮槽位保持 18x18；此值用于把图标居中其中。 */
-    private static final int PRIORITY_ICON_INSET = 1;
+    private static final int PRIORITY_BUTTON_V = 0;
+    private static final int PRIORITY_BUTTON_SIZE = 16;
+    private static final int PRIORITY_BUTTON_U_IDLE = 37;
+    private static final int PRIORITY_BUTTON_U_HOVER = 53;
+    private static final int PRIORITY_BUTTON_U_DOWN = 69;
+    /** 按钮为 16x16，而它的槽位保持 18x18；此值用于把按钮居中其中。 */
+    private static final int PRIORITY_INSET = 1;
+    /** 优先级图案：普通驱动器取第二排第三个，NeoECO 的存储矩阵取第三排第三个。 */
+    private static final int PRIORITY_ICON_U = 40;
+    private static final int PRIORITY_ICON_V = 18;
+    private static final int PRIORITY_ICON_W = 10;
+    private static final int PRIORITY_ICON_H = 11;
+    private static final int ECO_PRIORITY_ICON_U = 40;
+    private static final int ECO_PRIORITY_ICON_V = 35;
+    private static final int ECO_PRIORITY_ICON_W = 10;
+    private static final int ECO_PRIORITY_ICON_H = 10;
 
     /** 槽位井的底部两行：一条灰色容量凹槽叠在一条黑色边框线上。 */
     private static final int GROOVE_GRAY = 0xFF8E8F96;
@@ -295,6 +306,9 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static int pendingScrollOffset = -1;
     /** 上次布局时的工作卡状态，以便变化时触发重新布局。 */
     private boolean lastHadWorkCard;
+    /** 左侧工具栏的模糊模式按钮。 */
+    @Nullable
+    private SettingToggleButton<FuzzyMode> fuzzyButton;
     /**
      * 当前布局所基于的工作卡状态。绘制使用它而非实时值：从工作卡移除到下一次重新布局之间，
      * 图集仍按工作栏调整尺寸，若不用它绘制，会在工作栏位置短暂露出背景。
@@ -316,8 +330,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private long netTypeCapacity;
     private long netUsedBytes;
     private long netTotalBytes;
-    /** 当网络中存在无限元件时为真；此时两条凹槽都显示为满。 */
-    private boolean netInfinite;
+    /** 网络中存在不限字节容量的元件时为真；字节凹槽据此显示为无限。 */
+    private boolean netInfiniteBytes;
+    /** 网络中存在不限类型数的元件时为真（例如 omni 的通用元件）；类型凹槽据此显示为无限。 */
+    private boolean netInfiniteTypes;
 
     public WcmtScreen(WcmtMenu menu, Inventory playerInventory, Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
@@ -346,6 +362,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
         addToLeftToolbar(new SortButton());
         addToLeftToolbar(new SortDirectionButton());
+        // 模糊模式按钮常驻工具栏，可见性由所选元件是否装了模糊卡决定（见 updateBeforeRender）。
+        fuzzyButton = new SettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL,
+                this::toggleFuzzyMode);
+        addToLeftToolbar(fuzzyButton);
     }
 
     /**
@@ -537,29 +557,38 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private static final int CONFIG_COLS = 9;
 
     /**
-     * 工作台的三个按钮：16x16 的精灵图叠放在工作栏滚动条右侧，每个分区行一个，
-     * 居中于滚动条让出的空间。第 0 列是空闲精灵图，第 16 列是悬停/按下精灵图。
+     * 工作台的三个按钮：16x16 的方块叠放在工作栏滚动条右侧，每个分区行一个，
+     * 居中于滚动条让出的空间。第 0 列是空闲方块，第 16 列是悬停/按下的方块；
+     * 图案另取，并居中叠在方块上。
      */
     private static final int BAND_BUTTON_X = 187;
     private static final int BAND_BUTTON_SIZE = 16;
-    /**
-     * 按钮格在图集中高度并不一致：顶部两个（分区/清除）含边框为 16 行，两个复制状态为 17 行，
-     * 点亮的列则低一行且短一行。取每个按钮自身的高度可避免绘制时把下一格的深色上边框带入。
-     */
     private static final int BAND_BUTTON_Y = WORK_BAND_GRID_Y;
     private static final int BAND_BUTTON_STEP = 18;
     private static final int BAND_BUTTON_U_IDLE = 0;
     private static final int BAND_BUTTON_U_ACTIVE = 16;
-    /** 图集中点亮的列比空闲列低一像素。 */
-    private static final int BAND_BUTTON_ACTIVE_V_OFFSET = 1;
-    private static final int BAND_BUTTON_V_PARTITION = 21;
-    private static final int BAND_BUTTON_V_CLEAR = 37;
-    private static final int BAND_BUTTON_V_COPY_ON = 53;
-    /**
-     * 关闭状态的格多带一行上边框（y69+y70），因此起点低一行；
-     * 这样美术资源与开启状态对齐，并包含深色下边缘（y86）。
-     */
-    private static final int BAND_BUTTON_V_COPY_OFF = 70;
+    /** 底图：分区与清除按钮取第二排的方块，复制按钮取第三排的。 */
+    private static final int BAND_BUTTON_V_ROW2 = 21;
+    private static final int BAND_BUTTON_V_ROW3 = 37;
+    /** 分区按钮的图案（第二排第四个）。 */
+    private static final int BAND_ICON_PARTITION_U = 56;
+    private static final int BAND_ICON_PARTITION_V = 18;
+    private static final int BAND_ICON_PARTITION_W = 10;
+    private static final int BAND_ICON_PARTITION_H = 11;
+    /** 清除按钮的图案（第二排第五个）。 */
+    private static final int BAND_ICON_CLEAR_U = 73;
+    private static final int BAND_ICON_CLEAR_V = 19;
+    private static final int BAND_ICON_CLEAR_W = 8;
+    private static final int BAND_ICON_CLEAR_H = 9;
+    /** 复制按钮的图案：清空配置状态取第三排第四个，否则第五个。 */
+    private static final int BAND_ICON_COPY_ON_U = 54;
+    private static final int BAND_ICON_COPY_ON_V = 33;
+    private static final int BAND_ICON_COPY_ON_W = 11;
+    private static final int BAND_ICON_COPY_ON_H = 12;
+    private static final int BAND_ICON_COPY_OFF_U = 70;
+    private static final int BAND_ICON_COPY_OFF_V = 33;
+    private static final int BAND_ICON_COPY_OFF_W = 11;
+    private static final int BAND_ICON_COPY_OFF_H = 12;
 
     /** 覆盖整个槽位井的半透明绿色，用于标记选中的元件。 */
     private static final int SELECTED_CELL_HIGHLIGHT = 0x804CC919;
@@ -907,6 +936,10 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
             clientSortDescending = ClientDriveData.sortDescending();
         }
 
+        // 与原版元件工作台一致：按钮常驻工具栏，只在所选元件装了模糊卡时可见。
+        fuzzyButton.set(menu.getFuzzyMode());
+        fuzzyButton.setVisibility(menu.hasFuzzyCard());
+
         // 滚轮/轨道只选取新的行；待服务器确认后视图才跟随。
         int scrolled = scrollbar.getCurrentScroll();
         if (scrolled != lastRequestedScroll) {
@@ -926,6 +959,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     private void reinitialize() {
         new ArrayList<>(this.children()).forEach(this::removeWidget);
         this.init();
+    }
+
+    /** 模糊模式按钮：本地先切换，服务端写进所选元件，下一次渲染会从元件读回真实值。 */
+    private void toggleFuzzyMode(SettingToggleButton<FuzzyMode> button, boolean backwards) {
+        FuzzyMode next = button.getNextValue(backwards);
+        button.set(next);
+        PacketDistributor.sendToServer(new WcmtActionPayload(
+                WcmtActionPayload.ACTION_FUZZY_MODE, next.ordinal(), 0, ""));
     }
 
     /**
@@ -1124,10 +1165,21 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         }
         for (int i = 0; i < BAND_BUTTON_COUNT; i++) {
             boolean active = bandButtonActive(i, mouseX, mouseY);
+            int x = BAND_BUTTON_X;
+            int y = bandButtonTop(i);
             Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
-                    .src(BAND_BUTTON_U_IDLE + (active ? BAND_BUTTON_U_ACTIVE : 0), bandButtonV(i, active),
-                            BAND_BUTTON_SIZE, bandButtonSrcHeight(i, active))
-                    .dest(BAND_BUTTON_X, bandButtonTop(i))
+                    .src(BAND_BUTTON_U_IDLE + (active ? BAND_BUTTON_U_ACTIVE : 0),
+                            i < 2 ? BAND_BUTTON_V_ROW2 : BAND_BUTTON_V_ROW3,
+                            BAND_BUTTON_SIZE, BAND_BUTTON_SIZE)
+                    .dest(x, y)
+                    .blit(guiGraphics);
+            // 图案居中叠在方块上；各图案的尺寸不同，按自己的尺寸对齐。
+            SheetIcon icon = bandButtonIcon(i);
+            Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                    .src(icon.u(), icon.v(), icon.w(), icon.h())
+                    .dest(x + (BAND_BUTTON_SIZE - icon.w()) / 2,
+                            y + (BAND_BUTTON_SIZE - icon.h()) / 2)
+                    .zOffset(3)
                     .blit(guiGraphics);
         }
     }
@@ -1147,21 +1199,23 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      * 按钮在图集中的行：分区、清除，然后复制（其两行对应复制模式状态）。
      * 图集的第二列比第一列低一行，因此点亮变体偏移一行。
      */
-    private int bandButtonV(int i, boolean active) {
-        int base = switch (i) {
-            case 0 -> BAND_BUTTON_V_PARTITION;
-            case 1 -> BAND_BUTTON_V_CLEAR;
-            default -> menu.getCopyMode() == CopyMode.CLEAR_ON_REMOVE.ordinal()
-                    ? BAND_BUTTON_V_COPY_ON
-                    : BAND_BUTTON_V_COPY_OFF;
-        };
-        return active ? base + BAND_BUTTON_ACTIVE_V_OFFSET : base;
+    /** 图集里的一块图案；各图案的尺寸不同，绘制时按自身尺寸居中。 */
+    private record SheetIcon(int u, int v, int w, int h) {
     }
 
-    /** 此按钮在图集中占用的行数；点亮的列比空闲列短一行。 */
-    private static int bandButtonSrcHeight(int i, boolean active) {
-        int normal = i < 2 ? 16 : 17;
-        return active ? normal - 1 : normal;
+    /** 按钮 {@code i} 的图案：分区、清除，以及复制按钮的两种状态。 */
+    private SheetIcon bandButtonIcon(int i) {
+        return switch (i) {
+            case 0 -> new SheetIcon(BAND_ICON_PARTITION_U, BAND_ICON_PARTITION_V,
+                    BAND_ICON_PARTITION_W, BAND_ICON_PARTITION_H);
+            case 1 -> new SheetIcon(BAND_ICON_CLEAR_U, BAND_ICON_CLEAR_V,
+                    BAND_ICON_CLEAR_W, BAND_ICON_CLEAR_H);
+            default -> menu.getCopyMode() == CopyMode.CLEAR_ON_REMOVE.ordinal()
+                    ? new SheetIcon(BAND_ICON_COPY_ON_U, BAND_ICON_COPY_ON_V,
+                            BAND_ICON_COPY_ON_W, BAND_ICON_COPY_ON_H)
+                    : new SheetIcon(BAND_ICON_COPY_OFF_U, BAND_ICON_COPY_OFF_V,
+                            BAND_ICON_COPY_OFF_W, BAND_ICON_COPY_OFF_H);
+        };
     }
 
     /** 播放原版按钮点击音，与 AE2 自己（绘制的）按钮一致。 */
@@ -1306,28 +1360,47 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         if (by < 0) {
             return;
         }
-        // 16x16 的图标居中在按钮 18x18 的槽位内。
-        int bx = priorityButtonX() + PRIORITY_ICON_INSET;
-        by += PRIORITY_ICON_INSET;
-        int u = PRIORITY_ICON_U_IDLE;
+        // 16x16 的按钮居中在它 18x18 的槽位内。
+        int bx = priorityButtonX() + PRIORITY_INSET;
+        by += PRIORITY_INSET;
+        int u = PRIORITY_BUTTON_U_IDLE;
         if (pressedPriority == drive) {
-            u = PRIORITY_ICON_U_DOWN;
-        } else if (isHovering(bx, by, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE, mouseX, mouseY)) {
-            u = PRIORITY_ICON_U_HOVER;
+            u = PRIORITY_BUTTON_U_DOWN;
+        } else if (isHovering(bx, by, PRIORITY_BUTTON_SIZE, PRIORITY_BUTTON_SIZE, mouseX, mouseY)) {
+            u = PRIORITY_BUTTON_U_HOVER;
         }
         // drawFG 使用屏幕相对坐标，与其旁的图标和标签一样。
         Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
-                .src(u, PRIORITY_ICON_V, PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE)
+                .src(u, PRIORITY_BUTTON_V, PRIORITY_BUTTON_SIZE, PRIORITY_BUTTON_SIZE)
                 .dest(bx, by)
                 .blit(guiGraphics);
+
+        // 图案居中叠在底图上：NeoECO 的存储矩阵用自己那一枚。
+        boolean eco = isEcoDrive(drive);
+        int iconU = eco ? ECO_PRIORITY_ICON_U : PRIORITY_ICON_U;
+        int iconV = eco ? ECO_PRIORITY_ICON_V : PRIORITY_ICON_V;
+        int iconW = eco ? ECO_PRIORITY_ICON_W : PRIORITY_ICON_W;
+        int iconH = eco ? ECO_PRIORITY_ICON_H : PRIORITY_ICON_H;
+        Blitter.texture(ICON, ICON_SIZE, ICON_SIZE)
+                .src(iconU, iconV, iconW, iconH)
+                .dest(bx + (PRIORITY_BUTTON_SIZE - iconW) / 2,
+                        by + (PRIORITY_BUTTON_SIZE - iconH) / 2)
+                .zOffset(3)
+                .blit(guiGraphics);
+    }
+
+    /** 该驱动器是否是 NeoECO 的存储矩阵；优先级图案随之不同。 */
+    private boolean isEcoDrive(int drive) {
+        var drives = ClientDriveData.drives();
+        return drive >= 0 && drive < drives.size() && drives.get(drive).eco();
     }
 
     /** 优先级按钮是绘制出来的而非组件（每个可见驱动器一个）。 */
     private int priorityButtonAt(double mouseX, double mouseY) {
         for (int k = 0; k < ClientDriveData.drives().size(); k++) {
             int by = priorityButtonTop(k);
-            if (by >= 0 && isHovering(priorityButtonX() + PRIORITY_ICON_INSET, by + PRIORITY_ICON_INSET,
-                    PRIORITY_ICON_SIZE, PRIORITY_ICON_SIZE, mouseX, mouseY)) {
+            if (by >= 0 && isHovering(priorityButtonX() + PRIORITY_INSET, by + PRIORITY_INSET,
+                    PRIORITY_BUTTON_SIZE, PRIORITY_BUTTON_SIZE, mouseX, mouseY)) {
                 return k;
             }
         }
@@ -1403,7 +1476,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         netTypeCapacity = ClientDriveData.typeTotal();
         netUsedBytes = ClientDriveData.byteUsed();
         netTotalBytes = ClientDriveData.byteTotal();
-        netInfinite = ClientDriveData.infinite();
+        netInfiniteBytes = ClientDriveData.infinite();
+        netInfiniteTypes = ClientDriveData.infiniteTypes();
     }
 
     @Override
@@ -1443,14 +1517,14 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      * 两者都自下而上填充，颜色与驱动器表头相同。
      */
     private void drawProgressBars(GuiGraphics guiGraphics) {
-        drawProgressBar(guiGraphics, TYPE_BAR_X, netTypes, netTypeCapacity);
-        drawProgressBar(guiGraphics, STORAGE_BAR_X, netUsedBytes, netTotalBytes);
+        drawProgressBar(guiGraphics, TYPE_BAR_X, netTypes, netTypeCapacity, netInfiniteTypes);
+        drawProgressBar(guiGraphics, STORAGE_BAR_X, netUsedBytes, netTotalBytes, netInfiniteBytes);
     }
 
-    private void drawProgressBar(GuiGraphics guiGraphics, int x, long used, long total) {
+    private void drawProgressBar(GuiGraphics guiGraphics, int x, long used, long total, boolean infinite) {
         int top = inventoryTop() + BAR_V - INV_V;
-        if (netInfinite) {
-            // 无限存储没有可显示的比率：整条凹槽都用无限状态的条带。
+        if (infinite) {
+            // 无限的量没有可显示的比率：整条凹槽都用无限状态的条带。
             drawBarStrip(guiGraphics, x, top, BAR_U_UNLIMITED, BAR_H);
             return;
         }
@@ -1488,23 +1562,25 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      */
     private void addProgressTooltips(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         int top = inventoryTop() + BAR_V - INV_V;
-        if (netInfinite) {
-            // 网络中存在无限元件时，两条凹槽都显示为“无限”。
-            if (isHovering(TYPE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY)) {
-                guiGraphics.renderTooltip(font,
-                        Component.translatable("gui.cmt.groove_types_infinite"), mouseX, mouseY);
-            } else if (isHovering(STORAGE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY)) {
-                guiGraphics.renderTooltip(font,
-                        Component.translatable("gui.cmt.groove_storage_infinite"), mouseX, mouseY);
-            }
+        boolean overTypes = isHovering(TYPE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY);
+        boolean overStorage = isHovering(STORAGE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY);
+        // “类型数不受限”与“字节容量不受限”是两件事，各自只影响自己的凹槽。
+        if (overTypes && netInfiniteTypes) {
+            guiGraphics.renderTooltip(font,
+                    Component.translatable("gui.cmt.groove_types_infinite"), mouseX, mouseY);
             return;
         }
-        if (isHovering(TYPE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY)) {
+        if (overStorage && netInfiniteBytes) {
+            guiGraphics.renderTooltip(font,
+                    Component.translatable("gui.cmt.groove_storage_infinite"), mouseX, mouseY);
+            return;
+        }
+        if (overTypes) {
             guiGraphics.renderTooltip(font, tooltipLines(
-                    Component.translatable("gui.cmt.groove_types", formatBytes(netTypes),
-                            formatBytes(netTypeCapacity)),
+                    Component.translatable("gui.cmt.groove_types", formatCount(netTypes),
+                            formatCount(netTypeCapacity)),
                     usedLine(netTypes, netTypeCapacity)), mouseX, mouseY);
-        } else if (isHovering(STORAGE_BAR_X, top, BAR_W, BAR_H, mouseX, mouseY)) {
+        } else if (overStorage) {
             guiGraphics.renderTooltip(font, tooltipLines(
                     Component.translatable("gui.cmt.groove_storage", formatBytes(netUsedBytes),
                             formatBytes(netTotalBytes)),
@@ -1628,17 +1704,18 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 .blit(guiGraphics);
     }
 
+    /** 字节容量按 AE2 的写法格式化：1k = 1024，逐级 1024 进位。 */
     private static String formatBytes(long value) {
-        if (value < 1000) {
-            return Long.toString(value);
-        }
-        if (value < 1_000_000) {
-            return String.format(Locale.ROOT, "%.1fk", value / 1000.0);
-        }
-        if (value < 1_000_000_000L) {
-            return String.format(Locale.ROOT, "%.1fM", value / 1_000_000.0);
-        }
-        return String.format(Locale.ROOT, "%.1fG", value / 1_000_000_000.0);
+        return readable(Tooltips.getByteAmount(value));
+    }
+
+    /** 数量（例如物品种类数）按 AE2 的写法格式化：1k = 1000。 */
+    private static String formatCount(long value) {
+        return readable(Tooltips.getAmount(value));
+    }
+
+    private static String readable(Tooltips.Amount amount) {
+        return amount.unit().isEmpty() ? amount.digit() : amount.digit() + amount.unit();
     }
 
     private void blit(GuiGraphics guiGraphics, int x, int y, int u, int v, int width, int height) {

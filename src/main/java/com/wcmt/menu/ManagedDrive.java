@@ -55,6 +55,13 @@ public interface ManagedDrive {
         return false;
     }
 
+    /**
+     * 该宿主是否为 NeoECO 的存储矩阵。终端据此换用它的优先级图案，界面无需知道实现细节。
+     */
+    default boolean eco() {
+        return false;
+    }
+
     /** 整个驱动器的已用/总字节比，用于按使用量排序。 */
     double fillRatio();
 

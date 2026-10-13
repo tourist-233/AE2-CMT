@@ -258,6 +258,11 @@ final class NeoEcoDrive implements ManagedDrive {
     }
 
     @Override
+    public boolean eco() {
+        return true;
+    }
+
+    @Override
     public BlockPos pos() {
         return parts.get(0).getBlockPos();
     }

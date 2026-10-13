@@ -95,6 +95,11 @@ public final class ClientDriveData {
         return snapshot != null && snapshot.infinite();
     }
 
+    /** 网络中只要有元件的类型数不受限（例如 omni 的通用元件），就为 true。 */
+    public static boolean infiniteTypes() {
+        return snapshot != null && snapshot.typeInfinite();
+    }
+
     /** 服务端最后上报的排序键，用于初始化排序按钮。 */
     public static WcmtMenu.SortMode sortMode() {
         return snapshot == null ? WcmtMenu.SortMode.POSITION : WcmtMenu.SortMode.valueOf(snapshot.sort());

@@ -21,6 +21,7 @@ import com.wcmt.network.WcmtActionPayload;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.config.CopyMode;
+import appeng.api.config.FuzzyMode;
 import appeng.api.config.Setting;
 import appeng.api.config.Settings;
 import appeng.api.config.SortDir;
@@ -38,6 +39,7 @@ import appeng.api.upgrades.IUpgradeInventory;
 import appeng.api.upgrades.UpgradeInventories;
 import appeng.api.util.IConfigManager;
 import appeng.blockentity.storage.DriveBlockEntity;
+import appeng.core.definitions.AEItems;
 import appeng.core.localization.GuiText;
 import appeng.items.tools.powered.WirelessTerminalItem;
 import appeng.menu.AEBaseMenu;
@@ -134,8 +136,10 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
     private boolean needsTotals = true;
     /** 两个进度条的全网总计：typeUsed、typeTotal、byteUsed、byteTotal。 */
     private final long[] netTotals = new long[4];
-    /** 网络中任一元件为无限时为 true，进度条会将其显示为满。 */
+    /** 网络中任一元件为无限时为 true，字节进度条会将其显示为满。 */
     private boolean netInfinite;
+    /** 网络中任一元件的类型数不受限时为 true（例如 omni 的通用元件），类型进度条据此显示为无限。 */
+    private boolean netInfiniteTypes;
     /** 窗口中显示的首个内容行（一个驱动器占一个名称行加其元件行）。 */
     private int offset;
     /** 所有驱动器的内容行数；元件更多的驱动器占用更多行。 */
@@ -505,6 +509,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
                 markWorkbenchDirty();
             }
             case WcmtActionPayload.ACTION_APPLY_CELL -> handleCellRightClick(a);
+            case WcmtActionPayload.ACTION_FUZZY_MODE -> setSelectedCellFuzzyMode(a);
             case WcmtActionPayload.ACTION_PRIORITY -> {
                 // 打开驱动器自身的界面（它反正会替换此终端的菜单）；槽位索引
                 // 是客户端在快照中看到的那个，即位于可见窗口内。
@@ -656,6 +661,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         long byteUsed = 0;
         long byteTotal = 0;
         boolean infinite = false;
+        boolean infiniteTypes = false;
         for (ManagedDrive drive : drives) {
             for (int slot = 0; slot < drive.cellCount(); slot++) {
                 DriveSnapshotPayload.SlotStat stat = drive.stat(slot);
@@ -668,6 +674,8 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
                 // （NeoECO 的 omni 元件就是这么约定的），计入求和只会把总量减掉。
                 if (stat.typeCapacity() > 0) {
                     typeTotal += stat.typeCapacity();
+                } else if (stat.typeCapacity() < 0) {
+                    infiniteTypes = true;
                 }
                 if (stat.total() <= 0 || ManagedDrive.isInfinite(stat.total())) {
                     continue;
@@ -681,6 +689,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         netTotals[2] = byteUsed;
         netTotals[3] = byteTotal;
         netInfinite = infinite;
+        netInfiniteTypes = infiniteTypes;
     }
 
     private Comparator<ManagedDrive> comparatorFor(SortMode mode, List<ManagedDrive> drives) {
@@ -733,6 +742,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
                 new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked(),
                         sortConfig.getSetting(SORT_MODE).name(), search, linkStatusMessage(), infos,
                         netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite,
+                        netInfiniteTypes,
                         sortConfig.getSetting(Settings.SORT_DIRECTION) == SortDir.DESCENDING,
                         hasWorkCard(), configScroll, copyMode.ordinal(), selectedSlot));
     }
@@ -805,6 +815,46 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
             }
         }
         return false;
+    }
+
+    /** 所选元件当前的模糊模式，供左侧工具栏的按钮显示；未选中可配置元件时是默认值。 */
+    public FuzzyMode getFuzzyMode() {
+        ItemStack cell = selectedCell();
+        if (!cell.isEmpty() && cell.getItem() instanceof ICellWorkbenchItem cwi) {
+            FuzzyMode mode = cwi.getFuzzyMode(cell);
+            if (mode != null) {
+                return mode;
+            }
+        }
+        return FuzzyMode.IGNORE_ALL;
+    }
+
+    /**
+     * 所选元件是否装了模糊卡，界面据此决定模糊模式按钮的可见性。这里直接看元件升级槽里的物品，
+     * 而不用 {@code IUpgradeInventory.isInstalled}：后者只统计已在 {@code Upgrades} 注册表里登记过的卡，
+     * 没登记的元件即使插着卡也会返回 false。
+     */
+    public boolean hasFuzzyCard() {
+        for (int i = 0; i < workbenchUpgradeInv.size(); i++) {
+            if (workbenchUpgradeInv.getStackInSlot(i).is(AEItems.FUZZY_CARD.asItem())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 把模糊模式写到所选元件上；元件是从驱动器读出的栈，改完必须写回去。 */
+    private void setSelectedCellFuzzyMode(int ordinal) {
+        if (!canConfigure() || selectedSlot < 0 || !hasFuzzyCard()) {
+            return;
+        }
+        ItemStack cell = selectedCell();
+        if (cell.isEmpty() || !(cell.getItem() instanceof ICellWorkbenchItem cwi)) {
+            return;
+        }
+        cwi.setFuzzyMode(cell, FuzzyMode.values()[Math.floorMod(ordinal, FuzzyMode.values().length)]);
+        driveInventory.setItemDirect(selectedSlot, cell);
+        refreshSelectedCellCapabilities();
     }
 
     /**
@@ -983,7 +1033,8 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         for (int i = 0; i < cells; i++) {
             stats.add(drive.stat(i));
         }
-        return new DriveSnapshotPayload.DriveInfo(drive.pos(), drive.name(), drive.icon(), stats);
+        return new DriveSnapshotPayload.DriveInfo(drive.pos(), drive.name(), drive.icon(), stats,
+                drive.eco());
     }
 
     /** 菜单宿主，对外暴露以供 AE2WTlib 的通用终端集成使用。 */

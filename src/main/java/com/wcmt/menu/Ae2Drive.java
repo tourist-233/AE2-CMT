@@ -37,11 +37,6 @@ final class Ae2Drive implements ManagedDrive {
     }
 
     @Override
-    public boolean online() {
-        return drive.isPowered();
-    }
-
-    @Override
     public boolean openPriority(ServerPlayer player) {
         // AE2 的驱动器自身就是优先级宿主，因此可直接打开它自己的界面。
         return MenuOpener.open(PriorityMenu.TYPE, player, MenuLocators.forBlockEntity(drive));

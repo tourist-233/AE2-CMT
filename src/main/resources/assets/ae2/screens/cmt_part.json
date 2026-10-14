@@ -22,6 +22,10 @@
     "upgrades": {
       "right": 35,
       "top": 0
+    },
+    "workbenchUpgradeScrollbar": {
+      "right": 10,
+      "top": 150
     }
   }
 }

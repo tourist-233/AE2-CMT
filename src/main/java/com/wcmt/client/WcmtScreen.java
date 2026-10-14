@@ -35,7 +35,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import java.util.Optional;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.ChatFormatting;
@@ -172,8 +171,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** 工作栏图集内工作栏的滚动条凹槽；滑块在其两端之间滑动。 */
     private static final int WORK_BAND_TRACK_Y = 5;
     private static final int WORK_BAND_TRACK_H = 54;
-    /** 工作台的分区行一次可见的数量。 */
-    private static final int CONFIG_ROWS_VISIBLE = WcmtMenu.CONFIG_ROWS_VISIBLE;
     /** 遍历分区网格的滚动步数，供工作栏自己的滚动条滑块使用。 */
     private static final int CONFIG_SCROLL_STEPS = WcmtMenu.CONFIG_SCROLL_MAX + 1;
     /** 工作栏的滚动条滑块：AE2 的小滚动条精灵图，宽度与凹槽一致。 */
@@ -276,9 +273,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     /** 线缆部件形态的普通升级面板；无线终端下为 null。 */
     @Nullable
     private final UpgradesPanel partUpgradesPanel;
-    /** 工作卡自己的升级槽，由 AE2 面板绘制，使其外观与内容区一致。 */
-    @Nullable
-    private final UpgradesPanel workbenchUpgradesPanel;
 
     private int rows = MIN_ROWS;
     /** 每个可见驱动器的第一条内容行。 */
@@ -339,9 +333,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         super(menu, playerInventory, title, style);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.upgradeScrollbar = widgets.addScrollBar("workbenchUpgradeScrollbar", Scrollbar.SMALL);
-        // 该条带在 drawBG 中由 AE2WTlib 的可滚动升级条带纹理绘制（槽位与凹槽一起），
-        // 因此不使用 AE2 自己的 UpgradesPanel——它的边框会叠在纹理之上。
-        this.workbenchUpgradesPanel = null;
         // 无线终端使用 AE2WTlib 的可滚动面板，与通用终端相同：它要求菜单的槽位列表以量子桥
         // 奇点槽开头（WcmtMenu 已提供），并在槽位多于可容纳数量时保持该列可滚动。线缆部件形态
         // 完全没有升级库存，因此使用 AE2 的普通面板（保持为空），以占住图集的升级列。
@@ -475,10 +466,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
         } else if (partUpgradesPanel != null) {
             partUpgradesPanel.setPosition(new Point(imageWidth - 29, 0));
         }
-        if (workbenchUpgradesPanel != null) {
-            // 微调以对齐工作栏自身的行：相对面板默认位置右移 2px、下移 3px。
-            workbenchUpgradesPanel.setPosition(new Point(BAND_UPGRADE_X - 5 + 2, bandTop() - 3 + 3));
-        }
         // 工作台升级条带的 AE2 组件滚动条，位于其右侧。
         // 工作台自己的升级滚动条复用 AE2 的组件；其可见性在 positionWorkbenchSlots 中刷新，
         // 以便选中元件后立即出现。
@@ -595,9 +582,6 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
 
     /** 工作台升级槽之间的垂直间隔。 */
     private static final int BAND_UPGRADE_STEP = 18;
-    /** 升级条带面板的高度：其内边距加上每个升级槽一行。 */
-    private static final int BAND_UPGRADE_PANEL_HEIGHT =
-            10 + WcmtMenu.WORKBENCH_UPGRADE_SLOTS * BAND_UPGRADE_STEP;
     /** 在需要小滚动条之前可容纳的工作台升级槽数量。 */
     private static final int BAND_UPGRADE_VISIBLE = 3;
     /** 工作台自身升级槽所在的列，紧邻工作栏右缘之外。 */
@@ -611,20 +595,8 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
      * 条带的凹槽列（宽三像素）从纹理内 21 px 处开始；滑块宽七像素，因此此值把滑块居中其上。
      */
     private static final int BAND_UPGRADE_TRACK_X = BAND_UPGRADE_PANEL_X + 19;
-    /** 图集的面板颜色，用于给条带的滚动条列打底。 */
-    private static final int BAND_UPGRADE_PANEL = 0xFFCBCAD4;
-    /** AE2 在面板周围绘制的深色轮廓，用于封闭滚动条列。 */
-    private static final int BAND_UPGRADE_BORDER = 0xFF3C3C4E;
-    /** AE2 的升级槽图集；与元件工作台自身面板所用的精灵图相同。 */
-    private static final ResourceLocation UPGRADE_PANEL_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/extra_panels.png");
-    private static final int UPGRADE_SLOT_U = 5;
-    private static final int UPGRADE_SLOT_V = 5;
-    private static final int UPGRADE_SLOT_SIZE = 18;
     /** 面板图集中槽位周围的内边距；同时也是单条边框的宽度。 */
     private static final int UPGRADE_PADDING = 5;
-    /** AE2 在整个升级面板周围绘制的白色轮廓。 */
-    private static final int UPGRADE_PANEL_OUTLINE = 0xFFF2F2F2;
 
     /** 工作台升级滚动步：显示的第一个升级槽。 */
     private int upgradeScroll;
@@ -1271,6 +1243,25 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
     }
 
     /**
+     * 把窗口内的槽位池下标换算成所在驱动器的位置与该元件在其中的序号，形如
+     * {@code pos|localSlot}；下标不属于任何驱动器时返回空串。
+     *
+     * <p>服务端不能用槽位池下标定位元件：下标只对客户端当时看到的窗口成立，
+     * 驱动器列表一重排，同一个下标就落到别的元件上了。
+     */
+    private String selectionKey(int slot) {
+        int acc = 0;
+        for (var drive : ClientDriveData.drives()) {
+            int size = drive.slots().size();
+            if (slot < acc + size) {
+                return drive.pos().asLong() + "|" + (slot - acc);
+            }
+            acc += size;
+        }
+        return "";
+    }
+
+    /**
      * 在工作栏上滚动滚轮会步进其分区网格；在工作台升级槽上滚动则步进这些槽。
      * 在其他任何地方则滚动驱动器列表。
      */
@@ -1427,7 +1418,7 @@ public class WcmtScreen extends AEBaseScreen<WcmtMenu> implements IUniversalTerm
                 // 右键点击已选中的元件会取消选中。
                 menu.predictSelection(cell == menu.getSelectedSlot() ? -1 : cell);
                 PacketDistributor.sendToServer(new WcmtActionPayload(
-                        WcmtActionPayload.ACTION_APPLY_CELL, cell, 0, ""));
+                        WcmtActionPayload.ACTION_APPLY_CELL, cell, 0, selectionKey(cell)));
                 return true;
             }
         }

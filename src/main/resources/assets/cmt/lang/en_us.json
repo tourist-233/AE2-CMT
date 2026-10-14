@@ -18,6 +18,5 @@
   "gui.cmt.band.copy_state": "Currently: %s",
   "gui.cmt.band.copy_on": "clear configuration",
   "gui.cmt.band.copy_off": "do not clear configuration",
-  "gui.cmt.upgrade.select_cell": "Right-click a stored cell to install its upgrade cards",
-  "gui.cmt.upgrade.none": "This cell does not accept upgrade cards"
+  "gui.cmt.upgrade.select_cell": "Right-click a stored cell to install its upgrade cards"
 }

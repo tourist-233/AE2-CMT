@@ -49,24 +49,9 @@ public final class ClientDriveData {
         return snapshot != null && snapshot.blocked();
     }
 
-    /** 升级槽位中装有元件工作卡时为 true；此时界面会多绘制一条区域。 */
-    public static boolean workCard() {
-        return snapshot != null && snapshot.workCard();
-    }
-
     /** 该区域显示工作卡分区网格的哪一步。 */
     public static int configScroll() {
         return snapshot == null ? 0 : snapshot.configScroll();
-    }
-
-    /** 工作台复制模式，{@link appeng.api.config.CopyMode#ordinal()}。 */
-    public static int copyMode() {
-        return snapshot == null ? 0 : snapshot.copyMode();
-    }
-
-    /** 玩家最后右键点击的元件所在的驱动器槽位索引，无则为 -1。 */
-    public static int selectedSlot() {
-        return snapshot == null ? -1 : snapshot.selectedSlot();
     }
 
     public static List<DriveSnapshotPayload.DriveInfo> drives() {

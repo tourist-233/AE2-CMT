@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import appeng.api.networking.IManagedGridNode;
 import com.wcmt.WcmtMod;
 import com.wcmt.network.DriveSnapshotPayload;
 import net.minecraft.core.BlockPos;
@@ -38,10 +37,7 @@ final class NeoEcoDrive implements ManagedDrive {
 
     private static final String STORAGE_DRIVE_CLASS =
             "cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity";
-    private static final String BLOCK_ENTITY_BASE = "cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity";
-
     private static final Class<?> storageDriveClass;
-    private static final Method getMainNode;
     private static final Method getCluster;
     /** {@code ECODriveBlockEntity#isLockedByInfiniteMode()}：该 API 缺失时为 null。 */
     private static final Method isLockedByInfiniteMode;
@@ -69,13 +65,6 @@ final class NeoEcoDrive implements ManagedDrive {
         isLockedByInfiniteMode = driveClass == null
                 ? null
                 : findMethod(driveClass, "isLockedByInfiniteMode");
-        Method node = null;
-        try {
-            node = findMethod(Class.forName(BLOCK_ENTITY_BASE), "getMainNode");
-        } catch (ReflectiveOperationException | LinkageError e) {
-            node = null;
-        }
-        getMainNode = node;
         openBlockUi = findOpenBlockUi();
     }
 
@@ -246,15 +235,6 @@ final class NeoEcoDrive implements ManagedDrive {
     @Override
     public ItemStack icon() {
         return displayEntity().getBlockState().getBlock().asItem().getDefaultInstance();
-    }
-
-    @Override
-    public boolean online() {
-        BlockEntity first = parts.get(0);
-        if (getMainNode == null) {
-            return true;
-        }
-        return invoke(getMainNode, first) instanceof IManagedGridNode node && node.isOnline();
     }
 
     @Override

@@ -18,6 +18,5 @@
   "gui.cmt.band.copy_state": "当前：%s",
   "gui.cmt.band.copy_on": "清空配置",
   "gui.cmt.band.copy_off": "不清空配置",
-  "gui.cmt.upgrade.select_cell": "右键点击存储元件后可安装其支持的升级卡",
-  "gui.cmt.upgrade.none": "该元件不支持升级卡"
+  "gui.cmt.upgrade.select_cell": "右键点击存储元件后可安装其支持的升级卡"
 }

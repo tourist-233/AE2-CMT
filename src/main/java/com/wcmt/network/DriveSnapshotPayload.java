@@ -32,7 +32,7 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         boolean blocked, String sort, String search, Component status, List<DriveInfo> drives,
         long typeUsed, long typeTotal, long byteUsed, long byteTotal, boolean infinite,
         boolean typeInfinite, boolean sortDesc,
-        boolean workCard, int configScroll, int copyMode, int selectedSlot)
+        int configScroll, int copyMode, int selectedSlot)
         implements CustomPacketPayload {
 
     /**
@@ -89,7 +89,6 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         buf.writeBoolean(p.infinite());
         buf.writeBoolean(p.typeInfinite());
         buf.writeBoolean(p.sortDesc());
-        buf.writeBoolean(p.workCard());
         buf.writeVarInt(p.configScroll());
         buf.writeVarInt(p.copyMode());
         buf.writeVarInt(p.selectedSlot());
@@ -116,13 +115,11 @@ public record DriveSnapshotPayload(int offset, int totalRows, int skippedRows, i
         boolean infinite = buf.readBoolean();
         boolean typeInfinite = buf.readBoolean();
         boolean sortDesc = buf.readBoolean();
-        boolean workCard = buf.readBoolean();
         int configScroll = buf.readVarInt();
         int copyMode = buf.readVarInt();
         int selectedSlot = buf.readVarInt();
         return new DriveSnapshotPayload(offset, totalRows, skippedRows, windowRows, blocked, sort, search,
                 status, drives, typeUsed, typeTotal, byteUsed, byteTotal, infinite, typeInfinite, sortDesc,
-                workCard,
                 configScroll, copyMode, selectedSlot);
     }
 

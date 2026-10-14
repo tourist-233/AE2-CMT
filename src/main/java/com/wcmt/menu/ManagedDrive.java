@@ -27,8 +27,6 @@ public interface ManagedDrive {
 
     ItemStack icon();
 
-    boolean online();
-
     BlockPos pos();
 
     ResourceLocation dimension();

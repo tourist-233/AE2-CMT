@@ -34,9 +34,7 @@ import appeng.api.storage.ILinkStatus;
 import appeng.api.storage.StorageCells;
 import appeng.api.storage.cells.ICellWorkbenchItem;
 import appeng.api.upgrades.IUpgradeableItem;
-import appeng.api.upgrades.IUpgradeableObject;
 import appeng.api.upgrades.IUpgradeInventory;
-import appeng.api.upgrades.UpgradeInventories;
 import appeng.api.util.IConfigManager;
 import appeng.blockentity.storage.DriveBlockEntity;
 import appeng.core.definitions.AEItems;
@@ -46,13 +44,13 @@ import appeng.menu.AEBaseMenu;
 import appeng.menu.SlotSemantic;
 import appeng.menu.SlotSemantics;
 import appeng.api.stacks.KeyCounter;
-import appeng.menu.slot.CellPartitionSlot;
 import appeng.menu.slot.IPartitionSlotHost;
 import appeng.menu.slot.RestrictedInputSlot;
 import appeng.util.ConfigInventory;
 import appeng.util.ConfigMenuInventory;
 import appeng.util.inv.AppEngInternalInventory;
 import de.mari_023.ae2wtlib.api.gui.AE2wtlibSlotSemantics;
+import de.mari_023.ae2wtlib.api.terminal.AE2wtlibConfigManager;
 import de.mari_023.ae2wtlib.api.terminal.ItemWUT;
 import de.mari_023.ae2wtlib.api.terminal.WTMenuHost;
 import com.wcmt.part.WcmtTerminalPart;
@@ -62,6 +60,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
@@ -150,7 +149,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
     /** 排序的存放位置：无线终端的物品堆，或线缆部件。 */
     private final IConfigManager sortConfig;
     private String search = "";
-    private List<ManagedDrive> allDrives = List.of();
     private List<ManagedDrive> visibleDrives = List.of();
     /** 存在驱动器但都放不进槽位池时置位；会报告给客户端。 */
     private boolean windowOverflow;
@@ -184,20 +182,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
     /** 所选元件接受的升级卡数量；元件不支持升级卡时为 0，界面据此决定是否绘制升级条带。 */
     private int selectedCellUpgradeCount;
     /**
-     * 区域旁显示的升级卡槽位。它们跟随所选的元件：每种元件声明它接受多少张升级卡
-     * （见 {@link ICellWorkbenchItem#getUpgrades}），因此面板只显示该元件可用的卡。
-     */
-    private final IUpgradeableObject workbenchUpgrades = new IUpgradeableObject() {
-        @Override
-        public IUpgradeInventory getUpgrades() {
-            ItemStack cell = selectedCell();
-            if (!cell.isEmpty() && cell.getItem() instanceof appeng.api.upgrades.IUpgradeableItem item) {
-                return item.getUpgrades(cell);
-            }
-            return UpgradeInventories.empty();
-        }
-    };
-    /**
      * 区域的升级卡槽位。它们跟随所选元件并直接写回驱动器，因此插入这里的卡会真正落到元件上
      * （见 {@link SelectedCellUpgradesInventory}）。
      */
@@ -205,8 +189,12 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
             new SelectedCellUpgradesInventory(this);
     /** 玩家最后右键点击的元件的驱动器槽位索引，或 -1。会绘制高亮框。 */
     private int selectedSlot = -1;
-    /** 按网格顺序排列的分区槽位；客户端一次显示三行。 */
-    private final List<WorkbenchPartitionSlot> configSlots = new ArrayList<>();
+    /**
+     * 所选元件的稳定标识（{@code dimension|pos|localSlot}）。{@code selectedSlot} 只是窗口内的
+     * 槽位池下标，驱动器列表重排后同一个下标会落到别的元件上，因此服务端始终以这个标识为准。
+     */
+    @Nullable
+    private String selectedCellKey;
 
     /** 工作台网格存放在终端上的键。 */
     private static final String WORKBENCH_CONFIG_TAG = "CMTWorkbenchConfig";
@@ -297,6 +285,51 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         return null;
     }
 
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        // 网格编辑只置脏位，真正的写回发生在下一 tick 的 broadcastChanges 里；
+        // 关闭界面可能早于那一 tick，因此在这里补一次，避免最后一次编辑丢失。
+        saveWorkbench();
+    }
+
+    /** 清空所选元件；稳定标识一起丢掉，避免下次重扫又把它解析回来。 */
+    private void clearSelection() {
+        selectedSlot = -1;
+        selectedCellKey = null;
+        refreshSelectedCellCapabilities();
+    }
+
+    /**
+     * 窗口重排后按稳定标识找回所选元件的新槽位下标；找不到就清空选中。
+     * 少了这一步，滚动驱动器列表后 {@code selectedSlot} 会指向另一个元件，
+     * 分区、清除与模糊模式就会被写到它身上。
+     */
+    private void resolveSelection() {
+        if (selectedCellKey == null) {
+            selectedSlot = -1;
+            refreshSelectedCellCapabilities();
+            return;
+        }
+        int sep = selectedCellKey.lastIndexOf('|');
+        String driveKey = selectedCellKey.substring(0, sep);
+        int localSlot = Integer.parseInt(selectedCellKey.substring(sep + 1));
+        int acc = 0;
+        for (ManagedDrive drive : visibleDrives) {
+            if (driveKey.equals(drive.dimension() + "|" + drive.pos().asLong())) {
+                if (localSlot < drive.cellCount()) {
+                    selectedSlot = acc + localSlot;
+                    refreshSelectedCellCapabilities();
+                } else {
+                    clearSelection();
+                }
+                return;
+            }
+            acc += drive.cellCount();
+        }
+        clearSelection();
+    }
+
     public WcmtMenu(int id, Inventory playerInventory, WcmtMenuHost host) {
         this(id, playerInventory, ModMenus.WCMT_MENU_TYPE, host);
     }
@@ -312,8 +345,11 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         this.serverSide = isServerSide();
         // 排序保存在 AE2 的配置管理器中，它会持久化到承载此终端的对象上：
         // 无线物品堆或线缆部件。
+        // 无线形态用 AE2WTlib 的配置管理器，而不是 AE2 的：两者写到同一个 EXPORTED_SETTINGS
+        // 组件上，但 AE2 的 exportSettings 只导出自己认识的键，会把 AE2WTlib 存在同一物品堆上
+        // 的终端设置（排序键、视图模式等）一并抹掉；AE2WTlib 的实现以已有映射为基底，会保留它们。
         this.sortConfig = this.host != null
-                ? IConfigManager.builder(this.host::getItemStack)
+                ? AE2wtlibConfigManager.builder(this.host::getItemStack)
                         .registerSetting(SORT_MODE, SortMode.POSITION)
                         .registerSetting(Settings.SORT_DIRECTION, SortDir.ASCENDING)
                         .build()
@@ -339,7 +375,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
             // 由下面的 isPartitionSlotEnabled 决定。
             for (int i = 0; i < CONFIG_SLOTS; i++) {
                 var slot = new WorkbenchPartitionSlot(partitionGrid, this, i);
-                configSlots.add(slot);
                 addSlot(slot, SlotSemantics.CONFIG);
             }
 
@@ -508,7 +543,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
                         : CopyMode.CLEAR_ON_REMOVE;
                 markWorkbenchDirty();
             }
-            case WcmtActionPayload.ACTION_APPLY_CELL -> handleCellRightClick(a);
+            case WcmtActionPayload.ACTION_APPLY_CELL -> handleCellRightClick(text);
             case WcmtActionPayload.ACTION_FUZZY_MODE -> setSelectedCellFuzzyMode(a);
             case WcmtActionPayload.ACTION_PRIORITY -> {
                 // 打开驱动器自身的界面（它反正会替换此终端的菜单）；槽位索引
@@ -589,8 +624,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
             found.removeIf(drive -> !matchesSearch(drive, query));
         }
 
-        allDrives = found;
-
         int budget = Math.max(1, Math.min(MAX_ROWS, rowsBudget));
         int[] driveFirstRow = new int[found.size()];
         int rows = 0;
@@ -638,8 +671,9 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
         visibleDrives = window;
         activeSlots = usedCells;
         driveInventory.setDrives(window);
-        // 元件可能在两次扫描之间被换掉，能力缓存要跟着驱动器一起刷新。
-        refreshSelectedCellCapabilities();
+        // 元件可能在两次扫描之间被换掉，能力缓存要跟着驱动器一起刷新；
+        // 同时把选中项按稳定标识重新定位，避免槽位下标漂移到别的元件上。
+        resolveSelection();
     }
 
 
@@ -744,7 +778,7 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
                         netTotals[0], netTotals[1], netTotals[2], netTotals[3], netInfinite,
                         netInfiniteTypes,
                         sortConfig.getSetting(Settings.SORT_DIRECTION) == SortDir.DESCENDING,
-                        hasWorkCard(), configScroll, copyMode.ordinal(), selectedSlot));
+                        configScroll, copyMode.ordinal(), selectedSlot));
     }
 
     /**
@@ -771,11 +805,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
             return idx < selectedCellConfigSize;
         }
         return copyMode == CopyMode.KEEP_ON_REMOVE;
-    }
-
-    /** 选中了已存储的元件且可配置时为 true。 */
-    public boolean hasSelectedCell() {
-        return selectedSlot >= 0 && !selectedCell().isEmpty();
     }
 
     /**
@@ -930,20 +959,54 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
      * 元件加载（因此新元件从它自己的过滤条件开始），而在 {@code KEEP_ON_REMOVE} 下，网格
      * 保持原样——即使从一个元件切换到另一个，标记也留在原处。两种模式都不会自行清空所存储的网格。
      */
-    private void handleCellRightClick(int slotIndex) {
+    private void handleCellRightClick(String selectionKey) {
         // 与取放元件一致：终端未链接、超距或断电时不得改动驱动器里的元件。
-        if (!hasWorkCard() || !canConfigure() || slotIndex < 0 || slotIndex >= driveInventory.size()) {
+        if (!hasWorkCard() || !canConfigure()) {
+            return;
+        }
+        // 客户端发来的是「驱动器位置|元件在其中的序号」，而不是窗口内的槽位池下标：
+        // 下标只对客户端当时看到的窗口成立，两边窗口一旦错开就会选中别的元件。
+        int sep = selectionKey.lastIndexOf('|');
+        if (sep <= 0) {
+            return;
+        }
+        long drivePos;
+        int localSlot;
+        try {
+            drivePos = Long.parseLong(selectionKey.substring(0, sep));
+            localSlot = Integer.parseInt(selectionKey.substring(sep + 1));
+        } catch (NumberFormatException e) {
+            return;
+        }
+        int slotIndex = -1;
+        int acc = 0;
+        for (ManagedDrive drive : visibleDrives) {
+            if (drive.pos().asLong() == drivePos) {
+                if (localSlot >= 0 && localSlot < drive.cellCount()) {
+                    slotIndex = acc + localSlot;
+                }
+                break;
+            }
+            acc += drive.cellCount();
+        }
+        if (slotIndex < 0) {
+            // 该元件已经不在窗口里：顺着客户端的取消意图清空选中，
+            // 绝不能退回按下标处理。
+            if (selectedSlot >= 0) {
+                applyWorkbenchToCell(selectedSlot);
+                clearSelection();
+            }
             return;
         }
         if (selectedSlot >= 0) {
             applyWorkbenchToCell(selectedSlot);
             if (slotIndex == selectedSlot) {
-                selectedSlot = -1;
-                refreshSelectedCellCapabilities();
+                clearSelection();
                 return;
             }
         }
         selectedSlot = slotIndex;
+        selectedCellKey = rememberedSelection();
         refreshSelectedCellCapabilities();
         if (copyMode == CopyMode.CLEAR_ON_REMOVE) {
             loadWorkbenchFromCell(slotIndex);
@@ -999,11 +1062,6 @@ public class WcmtMenu extends AEBaseMenu implements IPartitionSlotHost {
     /** 玩家最后右键点击的元件的驱动器槽位索引，或 -1；客户端会绘制方框。 */
     public int getSelectedSlot() {
         return selectedSlot;
-    }
-
-    /** 包装所选元件自身的升级卡 inventory，供工作台的升级面板使用。 */
-    public IUpgradeableObject getWorkbenchUpgrades() {
-        return workbenchUpgrades;
     }
 
     /** 所选元件接受的升级卡数量；未选中任何元件或元件不支持升级卡时为 0。 */
